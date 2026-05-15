@@ -1,14 +1,13 @@
-2026-05-15 12:44:34,040 INFO Resolved model 'yolov8n.pt' -> yolov8n.pt
-2026-05-15 12:44:34,040 INFO Loading model from: yolov8n.pt
-2026-05-15 12:44:34,068 INFO Model loaded successfully: yolov8n.pt
+2026-05-15 12:56:46,213 INFO Resolved model 'yolov8n.pt' -> yolov8n.pt
+2026-05-15 12:56:46,213 INFO Loading model from: yolov8n.pt
+2026-05-15 12:56:46,249 INFO Model loaded successfully: yolov8n.pt
  * Serving Flask app 'app'
  * Debug mode: off
-2026-05-15 12:44:34,070 INFO [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2026-05-15 12:56:46,250 INFO [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
  * Running on http://172.20.229.126:5000
-2026-05-15 12:44:34,070 INFO [33mPress CTRL+C to quit[0m
-2026-05-15 12:44:50,529 INFO Resolved model 'yolov8n.pt' -> yolov8n.pt
-2026-05-15 12:44:50,530 INFO 127.0.0.1 - - [15/May/2026 12:44:50] "GET /health HTTP/1.1" 200 -
-2026-05-15 12:45:06,144 WARNING Could not resolve model 'badmodel', using as-is
-2026-05-15 12:45:06,145 INFO 127.0.0.1 - - [15/May/2026 12:45:06] "[31m[1mPOST /settings HTTP/1.1[0m" 400 -
+2026-05-15 12:56:46,250 INFO [33mPress CTRL+C to quit[0m
+2026-05-15 12:56:57,222 INFO 127.0.0.1 - - [15/May/2026 12:56:57] "POST /predict HTTP/1.1" 200 -
+2026-05-15 12:56:57,285 INFO 127.0.0.1 - - [15/May/2026 12:56:57] "POST /predict?format=pascalvoc HTTP/1.1" 200 -
+2026-05-15 12:58:31,171 INFO 127.0.0.1 - - [15/May/2026 12:58:31] "POST /predict?format=pascalvoc HTTP/1.1" 200 -

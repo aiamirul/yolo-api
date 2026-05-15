@@ -25,9 +25,10 @@
   .model-msg { font-size: .8rem; }
   .model-msg.ok { color: #3fb950; }
   .model-msg.err { color: #f85149; }
-  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; }
   .nav a { color: #58a6ff; text-decoration: none; font-size: .85rem; }
   .nav a:hover { text-decoration: underline; }
+  .server-url { margin-left: auto; font-size: .78rem; color: #8b949e; font-family: monospace; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 3px 8px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   h2 { font-size: 1rem; color: #58a6ff; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
   h2::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; }
 
@@ -76,7 +77,10 @@
 </head>
 <body>
 <div class="container">
-  <div class="nav"><a href="#" onclick="location.href=BASE+'/settings';return false">Settings</a></div>
+  <div class="nav">
+    <a href="#" onclick="location.href=BASE+'/settings';return false">Settings</a>
+    <span class="server-url" id="server-url" title="API base URL"></span>
+  </div>
   <h1>YOLO Object Detection API</h1>
   <p class="subtitle">Upload an image and detect objects using YOLOv8.</p>
 
@@ -118,13 +122,13 @@
     <p style="font-size:.85rem; color:#8b949e; margin-bottom:.5rem;">Health check</p>
     <div class="code-block">
       <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
-      <pre>curl http://localhost:5000/health</pre>
+      <pre id="curl-health">curl http://localhost:5000/health</pre>
     </div>
 
     <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">Predict from a local file</p>
     <div class="code-block">
       <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
-      <pre>python3 -c "
+      <pre id="curl-predict">python3 -c "
 import base64, json, sys
 with open(sys.argv[1], 'rb') as f:
     b64 = base64.b64encode(f.read()).decode()
@@ -183,6 +187,15 @@ curl -X POST http://localhost:5000/predict \
 
 <script>
 const BASE = location.pathname.replace(/\/gui\/?$/, '').replace(/\/settings\/?$/, '') || '';
+const API_URL = location.origin + BASE;
+document.getElementById('server-url').textContent = API_URL;
+document.getElementById('server-url').title = 'API base URL: ' + API_URL;
+
+// Update curl examples with actual URL
+const curlHealth = document.getElementById('curl-health');
+const curlPredict = document.getElementById('curl-predict');
+if (curlHealth) curlHealth.textContent = 'curl ' + API_URL + '/health';
+if (curlPredict) curlPredict.textContent = curlPredict.textContent.replace(/http:\/\/localhost:5000/g, API_URL);
 // --- Model selection ---
 const curModelEl = document.getElementById('cur-model');
 const modelPreset = document.getElementById('model-preset');

@@ -5,9 +5,10 @@ import glob
 import base64
 import logging
 import subprocess
+from xml.etree import ElementTree as ET
 import numpy as np
 import cv2
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, Response, render_template
 from ultralytics import YOLO
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -164,6 +165,7 @@ def predict():
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             return jsonify({"error": "Could not decode image"}), 400
+        h, w = img.shape[:2]
         yolo = get_model()
         results = yolo(img, verbose=False)
 
@@ -181,6 +183,27 @@ def predict():
                         "y2": round(float(box.xyxy[0][3]), 2),
                     },
                 })
+
+        fmt = request.args.get("format", "json").lower()
+
+        if fmt == "pascalvoc":
+            root = ET.Element("annotation")
+            ET.SubElement(root, "filename").text = "image"
+            size = ET.SubElement(root, "size")
+            ET.SubElement(size, "width").text = str(w)
+            ET.SubElement(size, "height").text = str(h)
+            ET.SubElement(size, "depth").text = str(img.shape[2] if len(img.shape) > 2 else 1)
+            for obj in objects:
+                o = ET.SubElement(root, "object")
+                ET.SubElement(o, "name").text = obj["label"]
+                ET.SubElement(o, "confidence").text = str(obj["confidence"])
+                bndbox = ET.SubElement(o, "bndbox")
+                ET.SubElement(bndbox, "xmin").text = str(int(obj["bbox"]["x1"]))
+                ET.SubElement(bndbox, "ymin").text = str(int(obj["bbox"]["y1"]))
+                ET.SubElement(bndbox, "xmax").text = str(int(obj["bbox"]["x2"]))
+                ET.SubElement(bndbox, "ymax").text = str(int(obj["bbox"]["y2"]))
+            xml_str = ET.tostring(root, encoding="unicode", xml_declaration=True)
+            return Response(xml_str, mimetype="text/xml")
 
         return jsonify({
             "model": MODEL_NAME,

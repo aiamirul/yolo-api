@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings - YOLO API</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; display: flex; justify-content: center; padding: 2rem; }
+  .container { max-width: 780px; width: 100%; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: .9rem; }
+  h2 { font-size: 1rem; color: #58a6ff; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+  h2::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+
+  .form-group { margin-bottom: 1rem; }
+  .form-group label { display: block; font-size: .85rem; color: #c9d1d9; margin-bottom: .4rem; font-weight: 600; }
+  .form-group .hint { font-size: .78rem; color: #8b949e; margin-top: .3rem; }
+  .form-group input { width: 100%; padding: .55rem .75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: .9rem; font-family: monospace; outline: none; transition: border-color .2s; }
+  .form-group input:focus { border-color: #58a6ff; }
+
+  .current { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .tag { background: #1f2937; border: 1px solid #30363d; border-radius: 6px; padding: 4px 10px; font-size: .8rem; font-family: monospace; color: #c9d1d9; }
+  .tag span { color: #8b949e; }
+
+  .btn-row { display: flex; gap: .75rem; align-items: center; }
+  .btn-save { padding: .6rem 1.5rem; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 8px; font-size: .9rem; cursor: pointer; font-weight: 600; transition: background .15s; }
+  .btn-save:hover { background: #2ea043; }
+  .btn-save:disabled { opacity: .4; cursor: default; }
+  .btn-cancel { padding: .6rem 1.5rem; background: transparent; color: #c9d1d9; border: 1px solid #30363d; border-radius: 8px; font-size: .9rem; cursor: pointer; transition: border-color .15s; }
+  .btn-cancel:hover { border-color: #8b949e; }
+  .msg { font-size: .85rem; display: none; }
+  .msg.ok { color: #3fb950; }
+  .msg.err { color: #f85149; }
+
+  /* code block */
+  .code-block { position: relative; }
+  .code-block pre { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; color: #c9d1d9; }
+  .copy-btn { position: absolute; top: .5rem; right: .5rem; background: #30363d; border: 1px solid #484f58; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: .75rem; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: background .15s; }
+  .copy-btn:hover { background: #484f58; }
+  .copy-btn.copied { background: #238636; border-color: #2ea043; color: #fff; }
+
+  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+  .nav a { color: #58a6ff; text-decoration: none; font-size: .85rem; }
+  .nav a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="/gui">Back to GUI</a>
+    <a href="/health">Health</a>
+  </div>
+  <h1>Settings</h1>
+  <p class="subtitle">Configure the YOLO model used by the prediction API.</p>
+
+  <!-- Current Config -->
+  <div class="section">
+    <h2>Current Configuration</h2>
+    <div class="current">
+      <div class="tag"><span>model:</span> <span id="cur-model"></span></div>
+      <div class="tag"><span>port:</span> <span id="cur-port"></span></div>
+    </div>
+  </div>
+
+  <!-- Update Model -->
+  <div class="section">
+    <h2>Update Model</h2>
+    <div class="form-group">
+      <label for="model-select">Available models</label>
+      <select id="model-select" style="width:100%; padding:.55rem .75rem; background:#0d1117; border:1px solid #30363d; border-radius:8px; color:#e6edf3; font-size:.9rem; outline:none;"></select>
+      <p class="hint">Built-in and custom models from <code>models/</code> directory. Place <code>.pt</code> files in <code>models/&lt;name&gt;/weights/</code> or directly in <code>models/</code>.</p>
+    </div>
+    <div class="form-group">
+      <label for="model-input">Or enter custom path</label>
+      <input type="text" id="model-input" placeholder="yolov8n">
+      <p class="hint">Full path to a <code>.pt</code> file outside the models directory. Server will restart automatically.</p>
+    </div>
+    <div class="btn-row">
+      <button class="btn-save" id="save-btn">Save & Restart</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+
+  <!-- Curl -->
+  <div class="section">
+    <h2>Update via cURL</h2>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre>curl -X POST http://localhost:5000/settings \
+  -H "Content-Type: application/json" \
+  -d '{"model": "yolov8s"}'</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadCurrent() {
+  try {
+    const [healthRes, modelsRes] = await Promise.all([fetch('/health'), fetch('/models')]);
+    const health = await healthRes.json();
+    const models = await modelsRes.json();
+    document.getElementById('cur-model').textContent = health.model;
+    document.getElementById('cur-port').textContent = window.location.port || '80';
+
+    const sel = document.getElementById('model-select');
+    sel.innerHTML = '';
+    models.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.label;
+      if (m.source === 'models/') opt.style.color = '#f0883e';
+      sel.appendChild(opt);
+    });
+    const names = models.models.map(m => m.name);
+    if (names.includes(models.current)) sel.value = models.current;
+    else document.getElementById('model-input').value = models.current;
+  } catch {}
+}
+loadCurrent();
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const customPath = document.getElementById('model-input').value.trim();
+  const selectVal = document.getElementById('model-select').value;
+  const model = customPath || selectVal;
+  const msg = document.getElementById('msg');
+  const btn = document.getElementById('save-btn');
+  if (!model) { msg.className = 'msg err'; msg.textContent = 'Enter a model name'; msg.style.display = 'inline'; return; }
+
+  btn.disabled = true;
+  msg.className = 'msg ok';
+  msg.textContent = 'Saving...';
+  msg.style.display = 'inline';
+
+  try {
+    const res = await fetch('/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = 'Model set to ' + data.model + '. Restarting...';
+      setTimeout(() => { window.location.reload(); }, 3000);
+    } else {
+      msg.className = 'msg err';
+      msg.textContent = data.error || 'Failed';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    msg.className = 'msg ok';
+    msg.textContent = 'Server restarting with model ' + model + '...';
+    setTimeout(() => { window.location.reload(); }, 4000);
+  }
+});
+
+function copyCode(btn) {
+  const pre = btn.parentElement.querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg> Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy'; }, 1500);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOLO Predict</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; display: flex; justify-content: center; padding: 2rem; }
+  .container { max-width: 780px; width: 100%; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .subtitle { color: #8b949e; margin-bottom: 1.5rem; font-size: .9rem; }
+  .model-bar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .model-badge { display: inline-flex; align-items: center; gap: .4rem; background: #1f2937; border: 1px solid #30363d; border-radius: 8px; padding: 6px 12px; font-size: .85rem; }
+  .model-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; flex-shrink: 0; }
+  .model-badge code { color: #f0883e; font-weight: 600; }
+  .model-select { display: flex; align-items: center; gap: .5rem; }
+  .model-select select { padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; font-size: .85rem; outline: none; }
+  .model-select select:focus { border-color: #58a6ff; }
+  .model-select input { padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; font-size: .85rem; font-family: monospace; width: 140px; outline: none; }
+  .model-select input:focus { border-color: #58a6ff; }
+  .btn-switch { padding: 5px 12px; background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; font-size: .8rem; cursor: pointer; transition: background .15s; }
+  .btn-switch:hover { background: #484f58; }
+  .btn-switch:disabled { opacity: .4; cursor: default; }
+  .model-msg { font-size: .8rem; }
+  .model-msg.ok { color: #3fb950; }
+  .model-msg.err { color: #f85149; }
+  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+  .nav a { color: #58a6ff; text-decoration: none; font-size: .85rem; }
+  .nav a:hover { text-decoration: underline; }
+  h2 { font-size: 1rem; color: #58a6ff; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+  h2::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; }
+
+  /* sections */
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+
+  /* steps */
+  .steps { display: grid; gap: .75rem; margin-bottom: .25rem; }
+  .step { display: flex; gap: .75rem; align-items: flex-start; }
+  .step-num { flex-shrink: 0; width: 24px; height: 24px; background: #30363d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; color: #58a6ff; }
+  .step p { line-height: 1.5; font-size: .9rem; color: #c9d1d9; }
+  .step code { background: #1f2937; padding: 1px 6px; border-radius: 4px; font-size: .82rem; color: #f0883e; }
+
+  /* api table */
+  .api-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .api-table th { text-align: left; color: #8b949e; font-weight: 600; padding: .4rem .5rem; border-bottom: 1px solid #30363d; }
+  .api-table td { padding: .4rem .5rem; border-bottom: 1px solid #21262d; }
+  .method { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: .75rem; font-weight: 700; font-family: monospace; }
+  .method-get { background: #1a3a1a; color: #3fb950; }
+  .method-post { background: #3a2a1a; color: #f0883e; }
+
+  /* code block */
+  .code-block { position: relative; }
+  .code-block pre { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; color: #c9d1d9; }
+  .copy-btn { position: absolute; top: .5rem; right: .5rem; background: #30363d; border: 1px solid #484f58; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: .75rem; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: background .15s; }
+  .copy-btn:hover { background: #484f58; }
+  .copy-btn.copied { background: #238636; border-color: #2ea043; color: #fff; }
+
+  /* upload */
+  .upload { border: 2px dashed #30363d; border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
+  .upload:hover { border-color: #58a6ff; background: #161b22; }
+  .upload input { display: none; }
+  .upload p { color: #8b949e; margin-top: .5rem; font-size: .85rem; }
+  .upload .icon { font-size: 2rem; margin-bottom: .5rem; }
+  #preview { max-width: 100%; margin-top: 1rem; border-radius: 8px; display: none; border: 1px solid #30363d; }
+  .canvas-wrap { position: relative; display: none; margin-top: 1rem; }
+  .canvas-wrap canvas { width: 100%; border-radius: 8px; border: 1px solid #30363d; display: block; }
+  .draw-controls { display: none; align-items: center; gap: .75rem; margin-top: .75rem; }
+  .toggle { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: #c9d1d9; cursor: pointer; user-select: none; }
+  .toggle input { accent-color: #58a6ff; }
+  .btn-predict { margin-top: 1rem; padding: .6rem 1.5rem; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 8px; font-size: .9rem; cursor: pointer; font-weight: 600; transition: background .15s; }
+  .btn-predict:hover { background: #2ea043; }
+  .btn-predict:disabled { opacity: .4; cursor: default; }
+  #results { margin-top: 1.5rem; white-space: pre-wrap; font-family: monospace; font-size: .82rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; max-height: 400px; overflow-y: auto; display: none; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav"><a href="/settings">Settings</a></div>
+  <h1>YOLO Object Detection API</h1>
+  <p class="subtitle">Upload an image and detect objects using YOLOv8.</p>
+
+  <div class="model-bar">
+    <div class="model-badge"><span class="dot"></span> Current: <code id="cur-model">...</code></div>
+    <div class="model-select">
+      <select id="model-preset"></select>
+      <input type="text" id="model-custom" placeholder="model path" style="display:none">
+      <button class="btn-switch" id="switch-btn">Switch</button>
+    </div>
+    <span class="model-msg" id="model-msg"></span>
+  </div>
+
+  <!-- Instructions -->
+  <div class="section">
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step"><span class="step-num">1</span><p>Upload an image using the dropzone below, or send a <code>POST</code> request with a base64-encoded image.</p></div>
+      <div class="step"><span class="step-num">2</span><p>The YOLO model processes the image and detects all objects.</p></div>
+      <div class="step"><span class="step-num">3</span><p>Results are returned as JSON with class labels, confidence scores, and bounding boxes.</p></div>
+    </div>
+  </div>
+
+  <!-- API Reference -->
+  <div class="section">
+    <h2>API Reference</h2>
+    <table class="api-table">
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/health</code></td><td>Check if the server is running</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/predict</code></td><td>Detect objects in a base64-encoded image</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/gui</code></td><td>This page</td></tr>
+    </table>
+  </div>
+
+  <!-- Curl Examples -->
+  <div class="section">
+    <h2>cURL Examples</h2>
+
+    <p style="font-size:.85rem; color:#8b949e; margin-bottom:.5rem;">Health check</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre>curl http://localhost:5000/health</pre>
+    </div>
+
+    <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">Predict from a local file</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre>python3 -c "
+import base64, json, sys
+with open(sys.argv[1], 'rb') as f:
+    b64 = base64.b64encode(f.read()).decode()
+print(json.dumps({'image': b64}))
+" image.jpg > /tmp/payload.json
+
+curl -X POST http://localhost:5000/predict \
+  -H "Content-Type: application/json" \
+  -d @/tmp/payload.json</pre>
+    </div>
+
+    <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">Response format</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre>{
+  "model": "yolov8n",
+  "count": 2,
+  "objects": [
+    {
+      "class": 0,
+      "label": "person",
+      "confidence": 0.8658,
+      "bbox": { "x1": 48.55, "y1": 398.56, "x2": 245.34, "y2": 902.71 }
+    },
+    {
+      "class": 5,
+      "label": "bus",
+      "confidence": 0.8733,
+      "bbox": { "x1": 22.88, "y1": 231.26, "x2": 805.0, "y2": 756.83 }
+    }
+  ]
+}</pre>
+    </div>
+  </div>
+
+  <!-- Interactive Upload -->
+  <div class="section">
+    <h2>Try It Out</h2>
+    <label class="upload" id="dropzone">
+      <input type="file" id="file" accept="image/*">
+      <div class="icon">&#128444;</div>
+      <span>Click or drop an image here</span>
+      <p id="filename"></p>
+    </label>
+    <img id="preview">
+    <div class="canvas-wrap" id="canvas-wrap"><canvas id="canvas"></canvas></div>
+    <div class="draw-controls" id="draw-controls">
+      <label class="toggle"><input type="checkbox" id="toggle-boxes" checked> Boxes</label>
+      <label class="toggle"><input type="checkbox" id="toggle-labels" checked> Labels</label>
+      <label class="toggle"><input type="checkbox" id="toggle-conf" checked> Confidence</label>
+    </div>
+    <button class="btn-predict" id="btn" disabled>Predict</button>
+    <pre id="results"></pre>
+  </div>
+</div>
+
+<script>
+// --- Model selection ---
+const curModelEl = document.getElementById('cur-model');
+const modelPreset = document.getElementById('model-preset');
+const modelCustom = document.getElementById('model-custom');
+const switchBtn = document.getElementById('switch-btn');
+const modelMsg = document.getElementById('model-msg');
+
+async function loadModels() {
+  try {
+    const res = await fetch('/models');
+    const data = await res.json();
+    curModelEl.textContent = data.current;
+    modelPreset.innerHTML = '';
+    data.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.label;
+      if (m.source === 'models/') opt.style.color = '#f0883e';
+      modelPreset.appendChild(opt);
+    });
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = 'Custom...';
+    modelPreset.appendChild(customOpt);
+    const names = data.models.map(m => m.name);
+    if (names.includes(data.current)) {
+      modelPreset.value = data.current;
+    } else {
+      modelPreset.value = 'custom';
+      modelCustom.style.display = '';
+      modelCustom.value = data.current;
+    }
+  } catch {}
+}
+loadModels();
+
+modelPreset.addEventListener('change', () => {
+  modelCustom.style.display = modelPreset.value === 'custom' ? '' : 'none';
+  if (modelPreset.value !== 'custom') modelCustom.value = '';
+});
+
+switchBtn.addEventListener('click', async () => {
+  const model = modelPreset.value === 'custom' ? modelCustom.value.trim() : modelPreset.value;
+  if (!model) { modelMsg.className = 'model-msg err'; modelMsg.textContent = 'Enter a model'; return; }
+  switchBtn.disabled = true;
+  modelMsg.className = 'model-msg ok';
+  modelMsg.textContent = 'Switching to ' + model + '...';
+  try {
+    const res = await fetch('/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model })
+    });
+    if (res.ok) {
+      setTimeout(() => { window.location.reload(); }, 3000);
+    } else {
+      const data = await res.json();
+      modelMsg.className = 'model-msg err';
+      modelMsg.textContent = data.error || 'Failed';
+      switchBtn.disabled = false;
+    }
+  } catch {
+    setTimeout(() => { window.location.reload(); }, 4000);
+  }
+});
+
+// --- Predict ---
+const fileInput = document.getElementById('file');
+const dropzone = document.getElementById('dropzone');
+const preview = document.getElementById('preview');
+const canvasWrap = document.getElementById('canvas-wrap');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const drawControls = document.getElementById('draw-controls');
+const toggleBoxes = document.getElementById('toggle-boxes');
+const toggleLabels = document.getElementById('toggle-labels');
+const toggleConf = document.getElementById('toggle-conf');
+const btn = document.getElementById('btn');
+const results = document.getElementById('results');
+const filename = document.getElementById('filename');
+let b64 = null, imgEl = null, lastObjects = [];
+
+const COLORS = ['#58a6ff','#f0883e','#3fb950','#f85149','#bc8cff','#79c0ff','#d2a8ff','#ffa657','#ff7b72','#56d364'];
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.style.borderColor = '#58a6ff'; });
+dropzone.addEventListener('dragleave', () => { dropzone.style.borderColor = '#30363d'; });
+dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.style.borderColor = '#30363d'; if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  filename.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    b64 = e.target.result.split(',')[1];
+    imgEl = new Image();
+    imgEl.onload = () => {
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      canvasWrap.style.display = 'none';
+      drawControls.style.display = 'none';
+      lastObjects = [];
+      btn.disabled = false;
+    };
+    imgEl.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function drawDetections() {
+  if (!imgEl) return;
+  canvas.width = imgEl.naturalWidth;
+  canvas.height = imgEl.naturalHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(imgEl, 0, 0);
+
+  const showBoxes = toggleBoxes.checked;
+  const showLabels = toggleLabels.checked;
+  const showConf = toggleConf.checked;
+  if (!showBoxes) return;
+
+  const scale = canvas.width / canvas.clientWidth;
+  lastObjects.forEach((obj, i) => {
+    const { x1, y1, x2, y2 } = obj.bbox;
+    const color = COLORS[i % COLORS.length];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, scale * 1.5);
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+    if (showLabels || showConf) {
+      const label = showLabels ? obj.label : '';
+      const conf = showConf ? (obj.confidence * 100).toFixed(1) + '%' : '';
+      const text = [label, conf].filter(Boolean).join(' ');
+      if (!text) return;
+
+      ctx.font = `bold ${Math.max(14, Math.round(canvas.width / 40))}px system-ui`;
+      const tm = ctx.measureText(text);
+      const pad = 4;
+      const lx = x1;
+      const ly = y1 > 22 ? y1 - 22 : y1;
+      ctx.fillStyle = color;
+      ctx.fillRect(lx, ly, tm.width + pad * 2, 20);
+      ctx.fillStyle = '#000';
+      ctx.fillText(text, lx + pad, ly + 15);
+    }
+  });
+}
+
+toggleBoxes.addEventListener('change', drawDetections);
+toggleLabels.addEventListener('change', drawDetections);
+toggleConf.addEventListener('change', drawDetections);
+
+btn.addEventListener('click', async () => {
+  if (!b64) return;
+  btn.disabled = true;
+  btn.textContent = 'Predicting...';
+  results.style.display = 'none';
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: b64 })
+    });
+    const data = await res.json();
+    lastObjects = data.objects || [];
+    results.style.display = 'block';
+    results.textContent = JSON.stringify(data, null, 2);
+
+    preview.style.display = 'none';
+    canvasWrap.style.display = 'block';
+    drawControls.style.display = 'flex';
+    drawDetections();
+  } catch (err) {
+    results.style.display = 'block';
+    results.textContent = 'Error: ' + err.message;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Predict';
+});
+
+function copyCode(btn) {
+  const pre = btn.parentElement.querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg> Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy'; }, 1500);
+  });
+}
+</script>
+</body>
+</html>

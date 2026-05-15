@@ -1,3 +1,5 @@
 .venv/*
 *.pt
 models/
+server.log
+server.pid

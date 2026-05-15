@@ -76,7 +76,7 @@
 </head>
 <body>
 <div class="container">
-  <div class="nav"><a href="/settings">Settings</a></div>
+  <div class="nav"><a href="#" onclick="location.href=BASE+'/settings';return false">Settings</a></div>
   <h1>YOLO Object Detection API</h1>
   <p class="subtitle">Upload an image and detect objects using YOLOv8.</p>
 
@@ -182,6 +182,7 @@ curl -X POST http://localhost:5000/predict \
 </div>
 
 <script>
+const BASE = location.pathname.replace(/\/gui\/?$/, '').replace(/\/settings\/?$/, '') || '';
 // --- Model selection ---
 const curModelEl = document.getElementById('cur-model');
 const modelPreset = document.getElementById('model-preset');
@@ -191,7 +192,7 @@ const modelMsg = document.getElementById('model-msg');
 
 async function loadModels() {
   try {
-    const res = await fetch('/models');
+    const res = await fetch(BASE + '/models');
     const data = await res.json();
     curModelEl.textContent = data.current;
     modelPreset.innerHTML = '';
@@ -230,13 +231,13 @@ switchBtn.addEventListener('click', async () => {
   modelMsg.className = 'model-msg ok';
   modelMsg.textContent = 'Switching to ' + model + '...';
   try {
-    const res = await fetch('/settings', {
+    const res = await fetch(BASE + '/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model })
     });
     if (res.ok) {
-      setTimeout(() => { window.location.reload(); }, 3000);
+      setTimeout(() => { location.reload(); }, 3000);
     } else {
       const data = await res.json();
       modelMsg.className = 'model-msg err';
@@ -339,7 +340,7 @@ btn.addEventListener('click', async () => {
   btn.textContent = 'Predicting...';
   results.style.display = 'none';
   try {
-    const res = await fetch('/predict', {
+    const res = await fetch(BASE + '/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: b64 })

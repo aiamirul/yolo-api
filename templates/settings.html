@@ -49,8 +49,8 @@
 <body>
 <div class="container">
   <div class="nav">
-    <a href="/gui">Back to GUI</a>
-    <a href="/health">Health</a>
+    <a href="#" onclick="location.href=BASE+'/gui';return false">Back to GUI</a>
+    <a href="#" onclick="window.open(BASE+'/health');return false">Health</a>
   </div>
   <h1>Settings</h1>
   <p class="subtitle">Configure the YOLO model used by the prediction API.</p>
@@ -96,9 +96,10 @@
 </div>
 
 <script>
+const BASE = location.pathname.replace(/\/settings\/?$/, '') || '';
 async function loadCurrent() {
   try {
-    const [healthRes, modelsRes] = await Promise.all([fetch('/health'), fetch('/models')]);
+    const [healthRes, modelsRes] = await Promise.all([fetch(BASE + '/health'), fetch(BASE + '/models')]);
     const health = await healthRes.json();
     const models = await modelsRes.json();
     document.getElementById('cur-model').textContent = health.model;
@@ -134,7 +135,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   msg.style.display = 'inline';
 
   try {
-    const res = await fetch('/settings', {
+    const res = await fetch(BASE + '/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model })

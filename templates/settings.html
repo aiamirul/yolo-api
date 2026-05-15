@@ -147,7 +147,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       setTimeout(() => { window.location.reload(); }, 3000);
     } else {
       msg.className = 'msg err';
-      msg.textContent = data.error || 'Failed';
+      msg.textContent = data.error + (data.hint ? ' — ' + data.hint : '');
       btn.disabled = false;
     }
   } catch (err) {

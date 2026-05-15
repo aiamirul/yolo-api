@@ -241,7 +241,7 @@ switchBtn.addEventListener('click', async () => {
     } else {
       const data = await res.json();
       modelMsg.className = 'model-msg err';
-      modelMsg.textContent = data.error || 'Failed';
+      modelMsg.textContent = data.error + (data.hint ? ' — ' + data.hint : '');
       switchBtn.disabled = false;
     }
   } catch {

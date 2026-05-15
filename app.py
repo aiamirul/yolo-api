@@ -3,11 +3,15 @@ import sys
 import json
 import glob
 import base64
+import logging
 import subprocess
 import numpy as np
 import cv2
 from flask import Flask, request, jsonify, render_template
 from ultralytics import YOLO
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("yolo-api")
 
 app = Flask(__name__)
 
@@ -63,25 +67,39 @@ def scan_models():
 
 def resolve_model(name):
     if os.path.isfile(name):
+        log.info("Resolved model '%s' -> %s", name, name)
         return name
     if os.path.isfile(f"{name}.pt"):
+        log.info("Resolved model '%s' -> %s", name, f"{name}.pt")
         return f"{name}.pt"
     for m in scan_models():
         if m["name"] == name and "path" in m:
+            log.info("Resolved model '%s' -> %s", name, m["path"])
             return m["path"]
+    log.warning("Could not resolve model '%s', using as-is", name)
     return name
 
 
 def get_model():
     global model
     if model is None:
-        model = YOLO(resolve_model(MODEL_NAME))
+        path = resolve_model(MODEL_NAME)
+        log.info("Loading model from: %s", path)
+        try:
+            model = YOLO(path)
+            log.info("Model loaded successfully: %s", MODEL_NAME)
+        except Exception as e:
+            log.error("Failed to load model '%s' from %s: %s", MODEL_NAME, path, e)
+            raise
     return model
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "model": MODEL_NAME})
+    resp = {"status": "ok", "model": MODEL_NAME, "model_path": resolve_model(MODEL_NAME)}
+    if model is not None:
+        resp["loaded"] = True
+    return jsonify(resp)
 
 
 @app.route("/models", methods=["GET"])
@@ -107,8 +125,17 @@ def update_settings():
     if not new_model:
         return jsonify({"error": "Missing 'model' field"}), 400
 
-    config["model"] = resolve_model(new_model)
+    resolved = resolve_model(new_model)
+    if not os.path.isfile(resolved):
+        return jsonify({
+            "error": f"Model file not found: {resolved}",
+            "resolved": resolved,
+            "hint": "Place .pt files in models/<name>/weights/ or use a full path",
+        }), 400
+
+    config["model"] = resolved
     save_config(config)
+    log.info("Settings updated: model -> %s (resolved: %s)", new_model, resolved)
 
     script_dir = os.path.dirname(__file__)
     subprocess.Popen(
@@ -167,5 +194,8 @@ def predict():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", config.get("port", 5000)))
-    get_model()
+    try:
+        get_model()
+    except Exception as e:
+        log.error("Startup model load failed: %s. Continuing without model.", e)
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("DEBUG", "0") == "1")

@@ -78,20 +78,15 @@
 <body>
 <div class="container">
   <div class="nav">
-    <a href="#" onclick="location.href=BASE+'/settings';return false">Settings</a>
+    <a href="#" onclick="location.href=BASE+'/manage';return false">Manage Models</a>
+    <a href="#" onclick="location.href=BASE+'/files';return false">Files</a>
     <span class="server-url" id="server-url" title="API base URL"></span>
   </div>
   <h1>YOLO Object Detection API</h1>
   <p class="subtitle">Upload an image and detect objects using YOLOv8.</p>
 
   <div class="model-bar">
-    <div class="model-badge"><span class="dot"></span> Current: <code id="cur-model">...</code></div>
-    <div class="model-select">
-      <select id="model-preset"></select>
-      <input type="text" id="model-custom" placeholder="model path" style="display:none">
-      <button class="btn-switch" id="switch-btn">Switch</button>
-    </div>
-    <span class="model-msg" id="model-msg"></span>
+    <div class="model-badge"><span class="dot"></span> Default: <code id="cur-model">...</code></div>
   </div>
 
   <!-- Instructions -->
@@ -109,9 +104,12 @@
     <h2>API Reference</h2>
     <table class="api-table">
       <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
-      <tr><td><span class="method method-get">GET</span></td><td><code>/health</code></td><td>Check if the server is running</td></tr>
-      <tr><td><span class="method method-post">POST</span></td><td><code>/predict</code></td><td>Detect objects in a base64-encoded image</td></tr>
-      <tr><td><span class="method method-get">GET</span></td><td><code>/gui</code></td><td>This page</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/health</code></td><td>Server status and loaded models</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/predict</code></td><td>Detect objects (optional <code>model</code> field)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/loaded</code></td><td>List loaded models and GPU info</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/load</code></td><td>Load a model into GPU</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/unload</code></td><td>Unload a model from GPU</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/manage</code></td><td>Model management UI</td></tr>
     </table>
   </div>
 
@@ -167,6 +165,10 @@ curl -X POST http://localhost:5000/predict \
   <!-- Interactive Upload -->
   <div class="section">
     <h2>Try It Out</h2>
+    <div style="margin-bottom:1rem; display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+      <label style="font-size:.85rem; color:#8b949e;">Model:</label>
+      <select id="predict-model" style="padding:6px 10px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:.85rem; outline:none;"></select>
+    </div>
     <label class="upload" id="dropzone">
       <input type="file" id="file" accept="image/*">
       <div class="icon">&#128444;</div>
@@ -196,71 +198,25 @@ const curlHealth = document.getElementById('curl-health');
 const curlPredict = document.getElementById('curl-predict');
 if (curlHealth) curlHealth.textContent = 'curl ' + API_URL + '/health';
 if (curlPredict) curlPredict.textContent = curlPredict.textContent.replace(/http:\/\/localhost:5000/g, API_URL);
-// --- Model selection ---
+// --- Model info ---
 const curModelEl = document.getElementById('cur-model');
-const modelPreset = document.getElementById('model-preset');
-const modelCustom = document.getElementById('model-custom');
-const switchBtn = document.getElementById('switch-btn');
-const modelMsg = document.getElementById('model-msg');
 
 async function loadModels() {
   try {
     const res = await fetch(BASE + '/models');
     const data = await res.json();
-    curModelEl.textContent = data.current;
-    modelPreset.innerHTML = '';
+    curModelEl.textContent = data.default;
+    const predictModel = document.getElementById('predict-model');
+    predictModel.innerHTML = '<option value="">Default (' + data.default + ')</option>';
     data.models.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.name;
-      opt.textContent = m.label;
-      if (m.source === 'models/') opt.style.color = '#f0883e';
-      modelPreset.appendChild(opt);
+      const popt = document.createElement('option');
+      popt.value = m.name;
+      popt.textContent = m.label;
+      predictModel.appendChild(popt);
     });
-    const customOpt = document.createElement('option');
-    customOpt.value = 'custom';
-    customOpt.textContent = 'Custom...';
-    modelPreset.appendChild(customOpt);
-    const names = data.models.map(m => m.name);
-    if (names.includes(data.current)) {
-      modelPreset.value = data.current;
-    } else {
-      modelPreset.value = 'custom';
-      modelCustom.style.display = '';
-      modelCustom.value = data.current;
-    }
   } catch {}
 }
 loadModels();
-
-modelPreset.addEventListener('change', () => {
-  modelCustom.style.display = modelPreset.value === 'custom' ? '' : 'none';
-  if (modelPreset.value !== 'custom') modelCustom.value = '';
-});
-
-switchBtn.addEventListener('click', async () => {
-  const model = modelPreset.value === 'custom' ? modelCustom.value.trim() : modelPreset.value;
-  if (!model) { modelMsg.className = 'model-msg err'; modelMsg.textContent = 'Enter a model'; return; }
-  switchBtn.disabled = true;
-  modelMsg.className = 'model-msg ok';
-  modelMsg.textContent = 'Switching to ' + model + '...';
-  try {
-    const res = await fetch(BASE + '/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model })
-    });
-    if (res.ok) {
-      setTimeout(() => { location.reload(); }, 3000);
-    } else {
-      const data = await res.json();
-      modelMsg.className = 'model-msg err';
-      modelMsg.textContent = data.error + (data.hint ? ' — ' + data.hint : '');
-      switchBtn.disabled = false;
-    }
-  } catch {
-    setTimeout(() => { window.location.reload(); }, 4000);
-  }
-});
 
 // --- Predict ---
 const fileInput = document.getElementById('file');
@@ -353,10 +309,13 @@ btn.addEventListener('click', async () => {
   btn.textContent = 'Predicting...';
   results.style.display = 'none';
   try {
+    const payload = { image: b64 };
+    const modelVal = document.getElementById('predict-model').value;
+    if (modelVal) payload.model = modelVal;
     const res = await fetch(BASE + '/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: b64 })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     lastObjects = data.objects || [];

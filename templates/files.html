@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File Manager - YOLO API</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; display: flex; justify-content: center; padding: 2rem; }
+  .container { max-width: 860px; width: 100%; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: .9rem; }
+  h2 { font-size: 1rem; color: #58a6ff; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+  h2::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+  .nav a { color: #58a6ff; text-decoration: none; font-size: .85rem; }
+  .nav a:hover { text-decoration: underline; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { text-align: left; color: #8b949e; font-weight: 600; padding: .5rem; border-bottom: 1px solid #30363d; }
+  td { padding: .5rem; border-bottom: 1px solid #21262d; vertical-align: middle; }
+  .bm-name { font-weight: 600; color: #f0883e; font-family: monospace; }
+  .bm-path { color: #8b949e; font-size: .78rem; font-family: monospace; }
+  .bm-count { font-family: monospace; color: #3fb950; }
+  .empty { color: #8b949e; text-align: center; padding: 1.5rem; font-size: .85rem; }
+
+  .form-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  .form-group { flex: 1; min-width: 140px; }
+  .form-group label { display: block; font-size: .78rem; color: #8b949e; margin-bottom: .3rem; font-weight: 600; }
+  .form-group input, .form-group select { width: 100%; padding: .5rem .7rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: .85rem; font-family: monospace; outline: none; }
+  .form-group input:focus { border-color: #58a6ff; }
+  .form-group .hint { font-size: .72rem; color: #6e7681; margin-top: .2rem; }
+
+  .btn { padding: .5rem 1.2rem; border-radius: 8px; font-size: .85rem; cursor: pointer; font-weight: 600; border: 1px solid transparent; transition: background .15s; }
+  .btn-add { background: #238636; color: #fff; border-color: #2ea043; }
+  .btn-add:hover { background: #2ea043; }
+  .btn-search { background: #1f6feb; color: #fff; border-color: #388bfd; }
+  .btn-search:hover { background: #388bfd; }
+  .btn-del { padding: 3px 10px; background: #da3633; color: #fff; border-color: #f85149; border-radius: 6px; font-size: .75rem; cursor: pointer; }
+  .btn-del:hover { background: #f85149; }
+  .btn:disabled { opacity: .4; cursor: default; }
+
+  .msg { font-size: .82rem; margin-top: .5rem; }
+  .msg.ok { color: #3fb950; }
+  .msg.err { color: #f85149; }
+
+  .search-bar { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; }
+  .search-bar .form-group { min-width: 160px; }
+
+  .results { margin-top: 1rem; }
+  .result-item { display: flex; justify-content: space-between; align-items: center; padding: .5rem; border-bottom: 1px solid #21262d; font-size: .82rem; gap: .5rem; }
+  .result-item:last-child { border-bottom: none; }
+  .result-name { font-family: monospace; color: #e6edf3; word-break: break-all; }
+  .result-path { font-family: monospace; color: #8b949e; font-size: .75rem; }
+  .result-size { color: #8b949e; font-size: .75rem; white-space: nowrap; }
+
+  .code-block { position: relative; }
+  .code-block pre { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; color: #c9d1d9; }
+  .copy-btn { position: absolute; top: .5rem; right: .5rem; background: #30363d; border: 1px solid #484f58; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; }
+  .copy-btn:hover { background: #484f58; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="#" onclick="location.href=BASE+'/gui';return false">Back to GUI</a>
+    <a href="#" onclick="location.href=BASE+'/manage';return false">Models</a>
+  </div>
+  <h1>File Manager</h1>
+  <p class="subtitle">Manage directory bookmarks for serving video and image files.</p>
+
+  <!-- Bookmarks List -->
+  <div class="section">
+    <h2>Bookmarks</h2>
+    <div id="bookmarks-table"></div>
+  </div>
+
+  <!-- Add Bookmark -->
+  <div class="section">
+    <h2>Add Bookmark</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="bm-name" placeholder="USH">
+        <p class="hint">Unique identifier for this bookmark</p>
+      </div>
+      <div class="form-group">
+        <label>Directory Path</label>
+        <input type="text" id="bm-path" placeholder="data/USH">
+        <p class="hint">Relative to project root</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Glob Pattern</label>
+        <input type="text" id="bm-pattern" placeholder="*/*.mp4" value="**/*">
+        <p class="hint">e.g. */*.mp4, **/*.jpg, **/*.mp4</p>
+      </div>
+      <div class="form-group">
+        <label>Label</label>
+        <input type="text" id="bm-label" placeholder="USH Videos">
+        <p class="hint">Display name (optional)</p>
+      </div>
+    </div>
+    <button class="btn btn-add" id="add-btn">Add Bookmark</button>
+    <span class="msg" id="add-msg"></span>
+  </div>
+
+  <!-- Test Search -->
+  <div class="section">
+    <h2>Test Search</h2>
+    <div class="search-bar">
+      <div class="form-group">
+        <label>Bookmark</label>
+        <select id="search-bookmark"></select>
+      </div>
+      <div class="form-group">
+        <label>Query (filename filter)</label>
+        <input type="text" id="search-query" placeholder="2026">
+      </div>
+      <div class="form-group" style="min-width:80px;flex:0;">
+        <label>Limit</label>
+        <input type="number" id="search-limit" value="5" min="1" max="100">
+      </div>
+      <button class="btn btn-search" id="search-btn">Search</button>
+    </div>
+    <div class="results" id="search-results"></div>
+  </div>
+
+  <!-- Curl Examples -->
+  <div class="section">
+    <h2>API Examples</h2>
+
+    <p style="font-size:.82rem; color:#8b949e; margin-bottom:.5rem;">List bookmarks</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>curl http://localhost:5000/getbookmarks</pre>
+    </div>
+
+    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Search for a file (serves file bytes if found)</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>curl "http://localhost:5000/getfile?bookmark=USH&query=2026&limit=1"</pre>
+    </div>
+
+    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Count files in bookmark</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>curl "http://localhost:5000/filecounts?bookmark=USH&query=2026"</pre>
+    </div>
+
+    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Add a bookmark</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>curl -X POST http://localhost:5000/bookmarks \
+  -H "Content-Type: application/json" \
+  -d '{"name":"USH","path":"data/USH","pattern":"*/*.mp4","label":"USH Videos"}'</pre>
+    </div>
+
+    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Delete a bookmark</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>curl -X DELETE http://localhost:5000/bookmarks \
+  -H "Content-Type: application/json" \
+  -d '{"name":"USH"}'</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = location.pathname.replace(/\/files\/?$/, '') || '';
+
+function fmtSize(b) {
+  if (!b) return '0 B';
+  const u = ['B','KB','MB','GB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + u[i];
+}
+
+async function loadBookmarks() {
+  try {
+    const res = await fetch(BASE + '/getbookmarks');
+    const data = await res.json();
+    const bm = data.bookmarks || {};
+    const names = Object.keys(bm);
+
+    // Table
+    const tableDiv = document.getElementById('bookmarks-table');
+    if (names.length === 0) {
+      tableDiv.innerHTML = '<p class="empty">No bookmarks yet. Add one below.</p>';
+    } else {
+      let html = '<table><tr><th>Name</th><th>Path</th><th>Pattern</th><th>Label</th><th></th></tr>';
+      names.forEach(n => {
+        const e = bm[n];
+        html += `<tr>
+          <td class="bm-name">${n}</td>
+          <td class="bm-path">${e.path}</td>
+          <td class="bm-path">${e.pattern}</td>
+          <td>${e.label || ''}</td>
+          <td><button class="btn-del" onclick="deleteBookmark('${n}')">Delete</button></td>
+        </tr>`;
+      });
+      html += '</table>';
+      tableDiv.innerHTML = html;
+    }
+
+    // Search dropdown
+    const sel = document.getElementById('search-bookmark');
+    const curVal = sel.value;
+    sel.innerHTML = '<option value="">-- select --</option>';
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n + ' (' + bm[n].label + ')';
+      sel.appendChild(opt);
+    });
+    if (curVal && names.includes(curVal)) sel.value = curVal;
+  } catch (err) {
+    console.error('Failed to load bookmarks:', err);
+  }
+}
+
+async function deleteBookmark(name) {
+  if (!confirm('Delete bookmark "' + name + '"?')) return;
+  try {
+    await fetch(BASE + '/bookmarks', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    loadBookmarks();
+  } catch {}
+}
+
+document.getElementById('add-btn').addEventListener('click', async () => {
+  const name = document.getElementById('bm-name').value.trim();
+  const path = document.getElementById('bm-path').value.trim();
+  const pattern = document.getElementById('bm-pattern').value.trim() || '**/*';
+  const label = document.getElementById('bm-label').value.trim();
+  const msg = document.getElementById('add-msg');
+  const btn = document.getElementById('add-btn');
+
+  if (!name || !path) { msg.className = 'msg err'; msg.textContent = 'Name and path are required'; return; }
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(BASE + '/bookmarks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, path, pattern, label })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = 'Bookmark "' + name + '" added';
+      document.getElementById('bm-name').value = '';
+      document.getElementById('bm-path').value = '';
+      document.getElementById('bm-pattern').value = '**/*';
+      document.getElementById('bm-label').value = '';
+      loadBookmarks();
+    } else {
+      msg.className = 'msg err';
+      msg.textContent = data.error;
+    }
+  } catch (err) {
+    msg.className = 'msg err';
+    msg.textContent = 'Request failed: ' + err.message;
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('search-btn').addEventListener('click', async () => {
+  const bookmark = document.getElementById('search-bookmark').value;
+  const query = document.getElementById('search-query').value.trim();
+  const limit = document.getElementById('search-limit').value || 5;
+  const results = document.getElementById('search-results');
+  const btn = document.getElementById('search-btn');
+
+  if (!bookmark) { results.innerHTML = '<p class="msg err" style="margin-top:.5rem">Select a bookmark</p>'; return; }
+
+  btn.disabled = true;
+  results.innerHTML = '<p style="color:#8b949e;font-size:.82rem;margin-top:.5rem">Searching...</p>';
+
+  try {
+    const params = new URLSearchParams({ bookmark, limit });
+    if (query) params.set('query', query);
+    const res = await fetch(BASE + '/getfile?' + params.toString());
+
+    if (res.headers.get('content-type')?.includes('application/json')) {
+      const data = await res.json();
+      if (data.status === 'notfound') {
+        results.innerHTML = `<div style="margin-top:.75rem;padding:.75rem;background:#0d1117;border:1px solid #30363d;border-radius:8px;font-size:.82rem">
+          <p style="color:#f85149;font-weight:600">No files found</p>
+          <p style="color:#8b949e;margin-top:.3rem">Bookmark: <code style="color:#f0883e">${data.bookmark}</code> &middot; Query: <code style="color:#f0883e">${data.query || '(none)'}</code></p>
+          <p style="color:#8b949e;margin-top:.2rem">Sample fallback: <code style="color:#58a6ff">${data.sample}</code></p>
+        </div>`;
+      } else if (data.files) {
+        let html = `<p style="font-size:.82rem;color:#8b949e;margin-top:.5rem">Found ${data.count} file(s):</p>`;
+        data.files.forEach(f => {
+          html += `<div class="result-item">
+            <div><div class="result-name">${f.name}</div><div class="result-path">${f.path}</div></div>
+            <div class="result-size">${fmtSize(f.size)}</div>
+          </div>`;
+        });
+        results.innerHTML = html;
+      }
+    } else {
+      const ct = res.headers.get('content-type');
+      const url = URL.createObjectURL(await res.blob());
+      if (ct?.includes('video')) {
+        results.innerHTML = `<div style="margin-top:.75rem"><video controls style="max-width:100%;border-radius:8px;border:1px solid #30363d"><source src="${url}" type="${ct}"></video></div>`;
+      } else if (ct?.includes('image')) {
+        results.innerHTML = `<div style="margin-top:.75rem"><img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid #30363d"></div>`;
+      } else {
+        results.innerHTML = `<div style="margin-top:.75rem;padding:.75rem;background:#0d1117;border:1px solid #30363d;border-radius:8px;font-size:.82rem"><p style="color:#3fb950">File served: ${ct}</p><a href="${url}" download style="color:#58a6ff">Download</a></div>`;
+      }
+    }
+  } catch (err) {
+    results.innerHTML = `<p class="msg err" style="margin-top:.5rem">Error: ${err.message}</p>`;
+  }
+  btn.disabled = false;
+});
+
+function copyCode(btn) {
+  const pre = btn.parentElement.querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  });
+}
+
+loadBookmarks();
+</script>
+</body>
+</html>

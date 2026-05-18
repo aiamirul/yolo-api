@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Models - YOLO API</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; display: flex; justify-content: center; padding: 2rem; }
+  .container { max-width: 780px; width: 100%; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: .9rem; }
+  h2 { font-size: 1rem; color: #58a6ff; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+  h2::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+
+  .gpu-bar { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  .tag { background: #1f2937; border: 1px solid #30363d; border-radius: 6px; padding: 4px 10px; font-size: .8rem; font-family: monospace; color: #c9d1d9; }
+  .tag span { color: #8b949e; }
+
+  .vram-bar { height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; margin-top: .5rem; }
+  .vram-fill { height: 100%; background: #238636; border-radius: 4px; transition: width .3s; }
+  .vram-fill.warn { background: #d29922; }
+  .vram-fill.danger { background: #f85149; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { text-align: left; color: #8b949e; font-weight: 600; padding: .5rem; border-bottom: 1px solid #30363d; }
+  td { padding: .5rem; border-bottom: 1px solid #21262d; vertical-align: middle; }
+  .model-name { font-weight: 600; color: #f0883e; font-family: monospace; }
+  .model-path { color: #8b949e; font-size: .78rem; font-family: monospace; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vram-cell { font-family: monospace; font-size: .82rem; }
+  .time-cell { color: #8b949e; font-size: .78rem; }
+
+  .btn-unload { padding: 4px 12px; background: #da3633; color: #fff; border: 1px solid #f85149; border-radius: 6px; font-size: .78rem; cursor: pointer; font-weight: 600; transition: background .15s; }
+  .btn-unload:hover { background: #f85149; }
+  .btn-unload:disabled { opacity: .4; cursor: default; }
+
+  .empty { color: #8b949e; text-align: center; padding: 2rem; font-size: .9rem; }
+
+  .load-row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+  .load-row select { flex: 1; min-width: 180px; padding: .55rem .75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: .9rem; outline: none; }
+  .load-row select:focus { border-color: #58a6ff; }
+  .load-row input { flex: 1; min-width: 180px; padding: .55rem .75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: .9rem; font-family: monospace; outline: none; }
+  .load-row input:focus { border-color: #58a6ff; }
+  .btn-load { padding: .55rem 1.5rem; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 8px; font-size: .9rem; cursor: pointer; font-weight: 600; transition: background .15s; }
+  .btn-load:hover { background: #2ea043; }
+  .btn-load:disabled { opacity: .4; cursor: default; }
+
+  .msg { font-size: .85rem; margin-top: .5rem; }
+  .msg.ok { color: #3fb950; }
+  .msg.err { color: #f85149; }
+
+  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+  .nav a { color: #58a6ff; text-decoration: none; font-size: .85rem; }
+  .nav a:hover { text-decoration: underline; }
+
+  .refresh-btn { padding: 4px 10px; background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; font-size: .78rem; cursor: pointer; margin-left: auto; }
+  .refresh-btn:hover { background: #484f58; }
+  .capacity { font-size: .8rem; color: #8b949e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="#" onclick="location.href=BASE+'/gui';return false">Back to GUI</a>
+    <a href="#" onclick="location.href=BASE+'/files';return false">Files</a>
+  </div>
+  <h1>Manage Loaded Models</h1>
+  <p class="subtitle">View and control which YOLO models are loaded in GPU memory.</p>
+
+  <!-- GPU Info -->
+  <div class="section" id="gpu-section">
+    <h2>GPU Status</h2>
+    <div class="gpu-bar" id="gpu-info"></div>
+    <div class="vram-bar"><div class="vram-fill" id="vram-fill" style="width:0%"></div></div>
+    <p class="capacity" id="vram-label"></p>
+  </div>
+
+  <!-- Loaded Models -->
+  <div class="section">
+    <h2>Loaded Models
+      <button class="refresh-btn" onclick="loadData()">Refresh</button>
+    </h2>
+    <div id="models-table"></div>
+  </div>
+
+  <!-- Load Model -->
+  <div class="section">
+    <h2>Load a Model</h2>
+    <div class="load-row">
+      <select id="model-select"></select>
+      <input type="text" id="model-custom" placeholder="Or enter path" style="display:none">
+      <button class="btn-load" id="load-btn">Load</button>
+    </div>
+    <p class="msg" id="load-msg"></p>
+  </div>
+</div>
+
+<script>
+const BASE = location.pathname.replace(/\/manage\/?$/, '').replace(/\/settings\/?$/, '') || '';
+
+function fmtBytes(b) {
+  if (!b || b === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + units[i];
+}
+
+function fmtTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString();
+}
+
+async function loadData() {
+  try {
+    const [loadedRes, modelsRes] = await Promise.all([
+      fetch(BASE + '/loaded'),
+      fetch(BASE + '/models')
+    ]);
+    const loaded = await loadedRes.json();
+    const models = await modelsRes.json();
+
+    // GPU info
+    const gpuInfo = document.getElementById('gpu-info');
+    const vramFill = document.getElementById('vram-fill');
+    const vramLabel = document.getElementById('vram-label');
+    if (loaded.gpu && loaded.gpu.total_vram) {
+      const pct = (loaded.gpu.allocated_vram / loaded.gpu.total_vram * 100).toFixed(1);
+      gpuInfo.innerHTML = `
+        <div class="tag"><span>GPU:</span> ${loaded.gpu.gpu_name}</div>
+        <div class="tag"><span>Used:</span> ${fmtBytes(loaded.gpu.allocated_vram)}</div>
+        <div class="tag"><span>Reserved:</span> ${fmtBytes(loaded.gpu.reserved_vram)}</div>
+        <div class="tag"><span>Total:</span> ${fmtBytes(loaded.gpu.total_vram)}</div>
+      `;
+      vramFill.style.width = pct + '%';
+      vramFill.className = 'vram-fill' + (pct > 85 ? ' danger' : pct > 60 ? ' warn' : '');
+      vramLabel.textContent = `${pct}% VRAM used (${loaded.count}/${loaded.max_loaded} models)`;
+    } else {
+      gpuInfo.innerHTML = '<div class="tag">No CUDA GPU detected</div>';
+      vramLabel.textContent = `${loaded.count}/${loaded.max_loaded} models loaded`;
+    }
+
+    // Models table
+    const tableDiv = document.getElementById('models-table');
+    if (loaded.models.length === 0) {
+      tableDiv.innerHTML = '<p class="empty">No models loaded. Use the section below to load one.</p>';
+    } else {
+      let html = '<table><tr><th>Model</th><th>Path</th><th>VRAM</th><th>Loaded At</th><th></th></tr>';
+      loaded.models.forEach(m => {
+        html += `<tr>
+          <td class="model-name">${m.name}</td>
+          <td class="model-path" title="${m.path}">${m.path}</td>
+          <td class="vram-cell">${m.vram_bytes ? fmtBytes(m.vram_bytes) : '—'}</td>
+          <td class="time-cell">${fmtTime(m.loaded_at)}</td>
+          <td><button class="btn-unload" onclick="unloadModel('${m.name}', this)">Unload</button></td>
+        </tr>`;
+      });
+      html += '</table>';
+      tableDiv.innerHTML = html;
+    }
+
+    // Model select
+    const sel = document.getElementById('model-select');
+    sel.innerHTML = '';
+    models.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.label;
+      if (m.source === 'models/') opt.style.color = '#f0883e';
+      const isLoaded = loaded.models.some(lm => lm.name === m.name);
+      if (isLoaded) opt.textContent += ' (loaded)';
+      sel.appendChild(opt);
+    });
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = 'Custom path...';
+    sel.appendChild(customOpt);
+  } catch (err) {
+    console.error('Failed to load data:', err);
+  }
+}
+
+async function unloadModel(name, btn) {
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const res = await fetch(BASE + '/unload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name })
+    });
+    if (res.ok) loadData();
+    else {
+      const data = await res.json();
+      alert(data.error || 'Failed to unload');
+      btn.disabled = false;
+      btn.textContent = 'Unload';
+    }
+  } catch {
+    btn.disabled = false;
+    btn.textContent = 'Unload';
+  }
+}
+
+document.getElementById('model-select').addEventListener('change', function() {
+  document.getElementById('model-custom').style.display = this.value === 'custom' ? '' : 'none';
+});
+
+document.getElementById('load-btn').addEventListener('click', async () => {
+  const sel = document.getElementById('model-select');
+  const customInput = document.getElementById('model-custom');
+  const model = sel.value === 'custom' ? customInput.value.trim() : sel.value;
+  const msg = document.getElementById('load-msg');
+  const btn = document.getElementById('load-btn');
+
+  if (!model) { msg.className = 'msg err'; msg.textContent = 'Select or enter a model'; return; }
+
+  btn.disabled = true;
+  msg.className = 'msg ok';
+  msg.textContent = 'Loading ' + model + '...';
+
+  try {
+    const res = await fetch(BASE + '/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = data.message;
+      loadData();
+    } else {
+      msg.className = 'msg err';
+      msg.textContent = data.error;
+    }
+  } catch (err) {
+    msg.className = 'msg err';
+    msg.textContent = 'Request failed: ' + err.message;
+  }
+  btn.disabled = false;
+});
+
+loadData();
+</script>
+</body>
+</html>

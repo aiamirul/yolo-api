@@ -3,3 +3,7 @@
 models/
 server.log
 server.pid
+.env
+vram_usage.json
+bookmarks.json
+sample/

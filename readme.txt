@@ -232,10 +232,11 @@ Response 500:
 
 --- WEB UI PAGES (GET, return HTML) ---
 
-GET /gui      - Interactive prediction GUI with image upload and canvas overlay
-GET /manage   - Model management dashboard (load/unload, GPU status, VRAM bar)
-GET /files    - File manager UI (bookmarks, search, test API calls)
-GET /settings - Redirects to /manage (backwards compatibility)
+GET /gui       - Interactive prediction GUI with image upload and canvas overlay
+GET /manage    - Model management dashboard (load/unload, GPU status, VRAM bar)
+GET /files     - File manager UI (bookmarks, upload, search, test API calls)
+GET /alldata_ui - Data manager UI (browse/save/delete annotation data)
+GET /settings  - Redirects to /manage (backwards compatibility)
 
 
 --- FILE / FOLDER MANAGEMENT ---
@@ -381,6 +382,128 @@ Response 200:
   "query": "2026"      // the query that was applied (empty string if none)
 }
 // If bookmark doesn't exist: total=0, filtered=0
+
+
+--- DATA SAVE / RETRIEVE (ALDATA) ---
+
+Save and retrieve annotation data (Pascal VOC XML or JSON).
+Files are stored in alldata/{FOLDER}/{unique_id}_{TAG}.xml|.json
+If no FOLDER is given, files save directly to alldata/.
+
+File naming: {12-char-hex-id}_{TAG}.{ext}
+  Example: a1b2c3d4e5f6_UNICORNS.json
+
+
+POST /alldata?TAG=UNICORNS&FOLDER=HORSES&filetype=PACLVOC
+----------------------------------------------------------
+Save annotation data. Body is raw JSON.
+
+Parameters (query string):
+  TAG       (required) - label appended to filename
+  FOLDER    (optional) - subfolder inside alldata/
+  filetype  (optional) - "JSON" (default) or "PASCALVOC"
+
+# Save as JSON:
+curl -X POST "http://localhost:5000/alldata?TAG=UNICORNS&FOLDER=HORSES" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "image001.jpg",
+    "folder": "HORSES",
+    "size": {"width": 800, "height": 600, "depth": 3},
+    "objects": [
+      {
+        "name": "horse",
+        "confidence": 0.95,
+        "bbox": {"x1": 100, "y1": 50, "x2": 400, "y2": 350}
+      }
+    ]
+  }'
+
+# Save as Pascal VOC XML:
+curl -X POST "http://localhost:5000/alldata?TAG=UNICORNS&FOLDER=HORSES&filetype=PASCALVOC" \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"image001.jpg","objects":[{"name":"horse","bbox":{"x1":100,"y1":50,"x2":400,"y2":350}}]}'
+
+Request body: raw JSON. Any structure is accepted.
+  For PASCALVOC, these keys are mapped to XML tags:
+    filename, folder, size (width/height/depth), source, objects/object
+    Each object: name, confidence, pose, truncated, difficult, bndbox/bbox
+  All other top-level keys become child elements of <annotation>.
+  For JSON mode, the body is saved as-is (pretty-printed).
+
+Response 200:
+{
+  "status": "ok",
+  "id": "a1b2c3d4e5f6",      // 12-char hex ID (use to retrieve later)
+  "tag": "UNICORNS",
+  "folder": "HORSES",
+  "filetype": "JSON",          // or "PASCALVOC"
+  "path": "alldata/HORSES/a1b2c3d4e5f6_UNICORNS.json"  // relative to project root
+}
+
+Response 400:
+{
+  "error": "Missing ?TAG= parameter"
+}
+
+
+GET /alldata?FOLDER=HORSES&TAG=UNICORNS&query=2026&limit=50&offset=0
+-------------------------------------------------------------------
+List saved data files. All parameters are optional.
+
+Parameters (query string):
+  FOLDER  (optional) - filter by subfolder
+  TAG     (optional) - filter by tag in filename
+  query   (optional) - substring filter on filename
+  limit   (optional) - max results per page. default 50.
+  offset  (optional) - pagination offset. default 0.
+
+curl "http://localhost:5000/alldata?FOLDER=HORSES&TAG=UNICORNS"
+
+Response 200:
+{
+  "files": [
+    {
+      "path": "alldata/HORSES/a1b2c3d4e5f6_UNICORNS.json",
+      "name": "a1b2c3d4e5f6_UNICORNS.json",
+      "size": 1024,              // bytes
+      "modified": 1716050000.123 // unix timestamp
+    }
+  ],
+  "total": 42,        // total matching files (before pagination)
+  "offset": 0,
+  "limit": 50,
+  "folder": "HORSES",
+  "tag": "UNICORNS",
+  "query": ""
+}
+
+
+GET /alldata/{id}
+-----------------
+Retrieve a saved data file by its 12-char hex ID.
+
+curl http://localhost:5000/alldata/a1b2c3d4e5f6
+
+# Or with full path:
+curl http://localhost:5000/alldata/HORSES/a1b2c3d4e5f6_UNICORNS
+
+For .json files, returns:
+{
+  "id": "a1b2c3d4e5f6",
+  "path": "alldata/HORSES/a1b2c3d4e5f6_UNICORNS.json",
+  "data": { ... }              // the original JSON body that was saved
+}
+
+For .xml files, returns the raw XML with Content-Type: text/xml.
+
+The ID search is recursive — it finds files matching {id}.* anywhere
+under alldata/. So "a1b2c3d4e5f6" matches "alldata/HORSES/a1b2c3d4e5f6_UNICORNS.json".
+
+Response 404:
+{
+  "error": "No data file found matching 'a1b2c3d4e5f6'"
+}
 
 
 --- CONFIGURATION ---

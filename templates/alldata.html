@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Manager - YOLO API</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; display: flex; justify-content: center; padding: 2rem; }
+  .container { max-width: 860px; width: 100%; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: .9rem; }
+  h2 { font-size: 1rem; color: #58a6ff; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+  h2::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .nav { margin-bottom: 1.5rem; display: flex; gap: 1rem; }
+  .nav a { color: #58a6ff; text-decoration: none; font-size: .85rem; }
+  .nav a:hover { text-decoration: underline; }
+  .stats-bar { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .5rem; }
+  .tag { background: #1f2937; border: 1px solid #30363d; border-radius: 6px; padding: 4px 10px; font-size: .8rem; font-family: monospace; color: #c9d1d9; }
+  .tag span { color: #8b949e; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { text-align: left; color: #8b949e; font-weight: 600; padding: .5rem; border-bottom: 1px solid #30363d; }
+  td { padding: .5rem; border-bottom: 1px solid #21262d; vertical-align: middle; }
+  .bm-name { font-weight: 600; color: #f0883e; font-family: monospace; cursor: pointer; }
+  .bm-name:hover { text-decoration: underline; }
+  .bm-stat { font-family: monospace; font-size: .8rem; }
+  .bm-stat .count { color: #3fb950; }
+  .bm-stat .size { color: #8b949e; }
+  .empty { color: #8b949e; text-align: center; padding: 1.5rem; font-size: .85rem; }
+
+  .form-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  .form-group { flex: 1; min-width: 140px; }
+  .form-group label { display: block; font-size: .78rem; color: #8b949e; margin-bottom: .3rem; font-weight: 600; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .5rem .7rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: .85rem; font-family: monospace; outline: none; }
+  .form-group input:focus, .form-group textarea:focus { border-color: #58a6ff; }
+  .form-group textarea { min-height: 160px; resize: vertical; line-height: 1.4; }
+  .form-group .hint { font-size: .72rem; color: #6e7681; margin-top: .2rem; }
+
+  .btn { padding: .5rem 1.2rem; border-radius: 8px; font-size: .85rem; cursor: pointer; font-weight: 600; border: 1px solid transparent; transition: background .15s; display: inline-flex; align-items: center; gap: .4rem; }
+  .btn-save { background: #238636; color: #fff; border-color: #2ea043; }
+  .btn-save:hover { background: #2ea043; }
+  .btn-search { background: #1f6feb; color: #fff; border-color: #388bfd; }
+  .btn-search:hover { background: #388bfd; }
+  .btn-del { padding: 3px 10px; background: #da3633; color: #fff; border-color: #f85149; border-radius: 6px; font-size: .75rem; cursor: pointer; }
+  .btn-del:hover { background: #f85149; }
+  .btn-view { padding: 3px 10px; background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; font-size: .75rem; cursor: pointer; }
+  .btn-view:hover { background: #484f58; }
+  .btn-sm { padding: 3px 10px; border-radius: 6px; font-size: .75rem; cursor: pointer; border: 1px solid transparent; }
+  .btn:disabled { opacity: .4; cursor: default; }
+
+  .msg { font-size: .82rem; margin-top: .5rem; }
+  .msg.ok { color: #3fb950; }
+  .msg.err { color: #f85149; }
+
+  .file-item { display: flex; justify-content: space-between; align-items: center; padding: .5rem; border-bottom: 1px solid #21262d; font-size: .82rem; gap: .5rem; }
+  .file-item:last-child { border-bottom: none; }
+  .file-name { font-family: monospace; color: #e6edf3; word-break: break-all; }
+  .file-path { font-family: monospace; color: #8b949e; font-size: .72rem; }
+  .file-meta { color: #8b949e; font-size: .75rem; white-space: nowrap; }
+  .file-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+
+  .pagination { display: flex; gap: .5rem; align-items: center; justify-content: center; margin-top: .75rem; }
+  .pagination button { padding: 4px 12px; background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 6px; font-size: .8rem; cursor: pointer; }
+  .pagination button:hover { background: #484f58; }
+  .pagination button:disabled { opacity: .3; cursor: default; }
+  .pagination span { font-size: .8rem; color: #8b949e; }
+
+  .viewer { margin-top: 1rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; max-height: 500px; overflow-y: auto; }
+  .viewer pre { font-size: .8rem; line-height: 1.5; color: #c9d1d9; white-space: pre-wrap; word-break: break-all; margin: 0; }
+  .viewer .viewer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+  .viewer .viewer-header span { font-family: monospace; color: #f0883e; font-size: .82rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="#" onclick="location.href=BASE+'/gui';return false">Back to GUI</a>
+    <a href="#" onclick="location.href=BASE+'/files';return false">Files</a>
+    <a href="#" onclick="location.href=BASE+'/manage';return false">Models</a>
+  </div>
+  <h1>Data Manager</h1>
+  <p class="subtitle">Browse, save, and manage annotation data (Pascal VOC XML / JSON).</p>
+
+  <!-- Folder Browser -->
+  <div class="section">
+    <h2>Folders</h2>
+    <div id="folder-stats" class="stats-bar"></div>
+    <div id="folder-table"></div>
+  </div>
+
+  <!-- Save New Data -->
+  <div class="section">
+    <h2>Save Data</h2>
+    <div class="form-row">
+      <div class="form-group" style="max-width:180px;">
+        <label>TAG</label>
+        <input type="text" id="save-tag" placeholder="UNICORNS">
+        <p class="hint">Required. Appended to filename.</p>
+      </div>
+      <div class="form-group" style="max-width:180px;">
+        <label>FOLDER</label>
+        <input type="text" id="save-folder" placeholder="HORSES">
+        <p class="hint">Optional. Creates subfolder.</p>
+      </div>
+      <div class="form-group" style="max-width:180px;">
+        <label>Format</label>
+        <select id="save-type">
+          <option value="JSON">JSON</option>
+          <option value="PASCALVOC">Pascal VOC XML</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Payload (raw JSON)</label>
+      <textarea id="save-payload" placeholder='{"filename":"img001.jpg","objects":[{"name":"horse","bbox":{"x1":100,"y1":50,"x2":400,"y2":350}}]}'></textarea>
+    </div>
+    <div style="margin-top:.5rem;display:flex;gap:.75rem;align-items:center;">
+      <button class="btn btn-save" id="save-btn">Save</button>
+      <span class="msg" id="save-msg"></span>
+    </div>
+  </div>
+
+  <!-- Browse Files -->
+  <div class="section">
+    <h2>Browse Files</h2>
+    <div class="form-row">
+      <div class="form-group" style="max-width:200px;">
+        <label>Folder</label>
+        <select id="browse-folder"><option value="">All folders</option></select>
+      </div>
+      <div class="form-group" style="max-width:180px;">
+        <label>TAG filter</label>
+        <input type="text" id="browse-tag" placeholder="UNICORNS">
+      </div>
+      <div class="form-group" style="max-width:180px;">
+        <label>Search</label>
+        <input type="text" id="browse-query" placeholder="filename...">
+      </div>
+      <button class="btn btn-search" id="browse-btn">Search</button>
+    </div>
+    <div id="browse-results"></div>
+    <div class="pagination" id="browse-pagination"></div>
+  </div>
+
+  <!-- Viewer -->
+  <div class="section" id="viewer-section" style="display:none">
+    <h2>Data Viewer</h2>
+    <div class="viewer" id="viewer"></div>
+  </div>
+</div>
+
+<script>
+const BASE = location.pathname.replace(/\/alldata_ui\/?$/, '') || '';
+
+function fmtSize(b) {
+  if (!b || b === 0) return '0 B';
+  const u = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + u[i];
+}
+
+function fmtTime(ts) {
+  return new Date(ts * 1000).toLocaleString();
+}
+
+function extractId(name) {
+  // a1b2c3d4e5f6_TAG.json -> a1b2c3d4e5f6
+  const m = name.match(/^([0-9a-f]{12})_/);
+  return m ? m[1] : name.replace(/\.\w+$/, '');
+}
+
+// --- Folders ---
+async function loadFolders() {
+  try {
+    const res = await fetch(BASE + '/alldata_folders');
+    const data = await res.json();
+    const folders = data.folders || [];
+
+    // Stats bar
+    const statsBar = document.getElementById('folder-stats');
+    statsBar.innerHTML = `
+      <div class="tag"><span>Total files:</span> ${data.total_files}</div>
+      <div class="tag"><span>Folders:</span> ${folders.length}</div>
+    `;
+
+    // Folder dropdown for browse
+    const browseFolder = document.getElementById('browse-folder');
+    const cur = browseFolder.value;
+    browseFolder.innerHTML = '<option value="">All folders</option>';
+    folders.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.name === '(root)' ? '' : f.name;
+      opt.textContent = f.name + ' (' + f.count + ' files, ' + fmtSize(f.total_size) + ')';
+      browseFolder.appendChild(opt);
+    });
+    if (cur) browseFolder.value = cur;
+
+    // Table
+    const tableDiv = document.getElementById('folder-table');
+    if (folders.length === 0) {
+      tableDiv.innerHTML = '<p class="empty">No data saved yet. Use the form below to save your first entry.</p>';
+      return;
+    }
+    let html = '<table><tr><th>Folder</th><th>Files</th><th>Total Size</th><th></th></tr>';
+    folders.forEach(f => {
+      const clickAttr = f.name === '(root)' ? '' : `onclick="browseFolderSelect('${f.name}')"`;
+      html += `<tr>
+        <td class="bm-name" ${clickAttr}>${f.name}</td>
+        <td class="bm-stat"><span class="count">${f.count}</span></td>
+        <td class="bm-stat"><span class="size">${fmtSize(f.total_size)}</span></td>
+        <td>${f.name !== '(root)' ? `<button class="btn-del" onclick="deleteFolder('${f.name}')">Delete All</button>` : ''}</td>
+      </tr>`;
+    });
+    html += '</table>';
+    tableDiv.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to load folders:', err);
+  }
+}
+
+window.browseFolderSelect = function(name) {
+  document.getElementById('browse-folder').value = name;
+  browseFiles(0);
+};
+
+window.deleteFolder = async function(name) {
+  if (!confirm('Delete ALL files in folder "' + name + '"? This cannot be undone.')) return;
+  // List all files in the folder and delete them one by one
+  try {
+    const res = await fetch(BASE + '/alldata?FOLDER=' + encodeURIComponent(name) + '&limit=9999');
+    const data = await res.json();
+    let deleted = 0;
+    for (const f of data.files) {
+      const id = extractId(f.name);
+      await fetch(BASE + '/alldata/' + id, { method: 'DELETE' });
+      deleted++;
+    }
+    alert('Deleted ' + deleted + ' file(s)');
+    loadFolders();
+    browseFiles(0);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+};
+
+// --- Save ---
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const tag = document.getElementById('save-tag').value.trim();
+  const folder = document.getElementById('save-folder').value.trim();
+  const filetype = document.getElementById('save-type').value;
+  const payloadStr = document.getElementById('save-payload').value.trim();
+  const msg = document.getElementById('save-msg');
+  const btn = document.getElementById('save-btn');
+
+  if (!tag) { msg.className = 'msg err'; msg.textContent = 'TAG is required'; return; }
+  if (!payloadStr) { msg.className = 'msg err'; msg.textContent = 'Payload is required'; return; }
+
+  let payload;
+  try {
+    payload = JSON.parse(payloadStr);
+  } catch (e) {
+    msg.className = 'msg err';
+    msg.textContent = 'Invalid JSON: ' + e.message;
+    return;
+  }
+
+  const params = new URLSearchParams({ TAG: tag, filetype });
+  if (folder) params.set('FOLDER', folder);
+
+  btn.disabled = true;
+  msg.className = 'msg ok';
+  msg.textContent = 'Saving...';
+
+  try {
+    const res = await fetch(BASE + '/alldata?' + params.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = 'Saved: ' + data.path;
+      loadFolders();
+      browseFiles(0);
+    } else {
+      msg.className = 'msg err';
+      msg.textContent = data.error;
+    }
+  } catch (err) {
+    msg.className = 'msg err';
+    msg.textContent = 'Failed: ' + err.message;
+  }
+  btn.disabled = false;
+});
+
+// --- Browse ---
+let browseOffset = 0;
+const PAGE_SIZE = 20;
+
+async function browseFiles(offset) {
+  browseOffset = offset || 0;
+  const folder = document.getElementById('browse-folder').value;
+  const tag = document.getElementById('browse-tag').value.trim();
+  const query = document.getElementById('browse-query').value.trim();
+  const results = document.getElementById('browse-results');
+  const pag = document.getElementById('browse-pagination');
+
+  const params = new URLSearchParams({ limit: PAGE_SIZE, offset: browseOffset });
+  if (folder) params.set('FOLDER', folder);
+  if (tag) params.set('TAG', tag);
+  if (query) params.set('query', query);
+
+  results.innerHTML = '<p style="color:#8b949e;font-size:.82rem">Loading...</p>';
+
+  try {
+    const res = await fetch(BASE + '/alldata?' + params.toString());
+    const data = await res.json();
+    const files = data.files || [];
+
+    if (files.length === 0) {
+      results.innerHTML = '<p class="empty">No files found.</p>';
+      pag.innerHTML = '';
+      return;
+    }
+
+    let html = `<p style="font-size:.82rem;color:#8b949e;margin-bottom:.5rem">${data.total} total file(s)</p>`;
+    files.forEach(f => {
+      const id = extractId(f.name);
+      const isJson = f.name.endsWith('.json');
+      html += `<div class="file-item">
+        <div>
+          <div class="file-name">${f.name}</div>
+          <div class="file-path">${f.path}</div>
+        </div>
+        <div class="file-meta">${fmtSize(f.size)} &middot; ${fmtTime(f.modified)}</div>
+        <div class="file-actions">
+          <button class="btn-view" onclick="viewFile('${id}')">View</button>
+          <a class="btn-sm btn-view" href="${BASE}/alldata/${id}" target="_blank" style="text-decoration:none;color:#c9d1d9">Open</a>
+          <button class="btn-del" onclick="deleteFile('${id}','${f.name}')">Delete</button>
+        </div>
+      </div>`;
+    });
+    results.innerHTML = html;
+
+    // Pagination
+    const totalPages = Math.ceil(data.total / PAGE_SIZE);
+    const curPage = Math.floor(browseOffset / PAGE_SIZE) + 1;
+    let ph = '';
+    ph += `<button ${curPage <= 1 ? 'disabled' : ''} onclick="browseFiles(${browseOffset - PAGE_SIZE})">Prev</button>`;
+    ph += `<span>Page ${curPage} of ${totalPages}</span>`;
+    ph += `<button ${curPage >= totalPages ? 'disabled' : ''} onclick="browseFiles(${browseOffset + PAGE_SIZE})">Next</button>`;
+    pag.innerHTML = ph;
+  } catch (err) {
+    results.innerHTML = `<p class="msg err">Error: ${err.message}</p>`;
+    pag.innerHTML = '';
+  }
+}
+
+document.getElementById('browse-btn').addEventListener('click', () => browseFiles(0));
+
+window.viewFile = async function(id) {
+  const section = document.getElementById('viewer-section');
+  const viewer = document.getElementById('viewer');
+  section.style.display = '';
+  viewer.innerHTML = '<p style="color:#8b949e">Loading...</p>';
+
+  try {
+    const res = await fetch(BASE + '/alldata/' + id);
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const data = await res.json();
+      viewer.innerHTML = `
+        <div class="viewer-header">
+          <span>${data.path || id}</span>
+          <button class="btn-sm btn-del" onclick="deleteFile('${id}','')">Delete</button>
+        </div>
+        <pre>${JSON.stringify(data.data, null, 2)}</pre>`;
+    } else {
+      const text = await res.text();
+      viewer.innerHTML = `
+        <div class="viewer-header">
+          <span>${id}.xml</span>
+          <button class="btn-sm btn-del" onclick="deleteFile('${id}','')">Delete</button>
+        </div>
+        <pre>${escapeHtml(text)}</pre>`;
+    }
+  } catch (err) {
+    viewer.innerHTML = `<p class="msg err">Error: ${err.message}</p>`;
+  }
+};
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.deleteFile = async function(id, name) {
+  const label = name || id;
+  if (!confirm('Delete "' + label + '"?')) return;
+  try {
+    const res = await fetch(BASE + '/alldata/' + id, { method: 'DELETE' });
+    if (res.ok) {
+      document.getElementById('viewer-section').style.display = 'none';
+      loadFolders();
+      browseFiles(browseOffset);
+    } else {
+      const data = await res.json();
+      alert(data.error || 'Delete failed');
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+};
+
+loadFolders();
+browseFiles(0);
+</script>
+</body>
+</html>

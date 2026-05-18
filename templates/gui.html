@@ -80,6 +80,7 @@
   <div class="nav">
     <a href="#" onclick="location.href=BASE+'/manage';return false">Manage Models</a>
     <a href="#" onclick="location.href=BASE+'/files';return false">Files</a>
+    <a href="#" onclick="location.href=BASE+'/alldata_ui';return false">Data</a>
     <span class="server-url" id="server-url" title="API base URL"></span>
   </div>
   <h1>YOLO Object Detection API</h1>
@@ -109,6 +110,8 @@
       <tr><td><span class="method method-get">GET</span></td><td><code>/loaded</code></td><td>List loaded models and GPU info</td></tr>
       <tr><td><span class="method method-post">POST</span></td><td><code>/load</code></td><td>Load a model into GPU</td></tr>
       <tr><td><span class="method method-post">POST</span></td><td><code>/unload</code></td><td>Unload a model from GPU</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/alldata</code></td><td>Save annotation data (JSON/XML)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/alldata</code></td><td>List saved data files</td></tr>
       <tr><td><span class="method method-get">GET</span></td><td><code>/manage</code></td><td>Model management UI</td></tr>
     </table>
   </div>
@@ -159,6 +162,51 @@ curl -X POST http://localhost:5000/predict \
     }
   ]
 }</pre>
+    </div>
+
+    <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">Save annotation data as JSON</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre id="curl-alldata-json">curl -X POST "http://localhost:5000/alldata?TAG=HORSES&FOLDER=FARM" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "filename": "stable_001.jpg",
+  "size": {"width": 800, "height": 600, "depth": 3},
+  "objects": [
+    {"name": "horse", "confidence": 0.95, "bbox": {"x1": 120, "y1": 80, "x2": 450, "y2": 520}},
+    {"name": "horse", "confidence": 0.87, "bbox": {"x1": 500, "y1": 150, "x2": 750, "y2": 480}}
+  ]
+}'</pre>
+    </div>
+
+    <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">Save as Pascal VOC XML</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre id="curl-alldata-xml">curl -X POST "http://localhost:5000/alldata?TAG=DOGS&PARK&filetype=PASCALVOC" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "filename": "dog_park.jpg",
+  "size": {"width": 1024, "height": 768, "depth": 3},
+  "objects": [
+    {"name": "dog", "confidence": 0.92, "bbox": {"x1": 50, "y1": 100, "x2": 350, "y2": 600}},
+    {"name": "dog", "confidence": 0.78, "bbox": {"x1": 600, "y1": 200, "x2": 900, "y2": 650}}
+  ]
+}'</pre>
+    </div>
+
+    <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">List saved data</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre>curl "http://localhost:5000/alldata?FOLDER=DEMO"
+curl "http://localhost:5000/alldata?TAG=HORSES"
+curl "http://localhost:5000/alldata_folders"</pre>
+    </div>
+
+    <p style="font-size:.85rem; color:#8b949e; margin: 1rem 0 .5rem;">Retrieve saved data by ID</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg> Copy</button>
+      <pre>curl http://localhost:5000/alldata/a1b2c3d4e5f6
+curl http://localhost:5000/alldata/d4e5f6a1b2c3</pre>
     </div>
   </div>
 

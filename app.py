@@ -3,6 +3,7 @@ import sys
 import json
 import glob
 import base64
+import uuid
 import mimetypes
 import threading
 import logging
@@ -33,6 +34,7 @@ DEFAULT_MODEL = config.get("default_model", config.get("model", "yolov8n"))
 # --- Bookmarks ---
 BOOKMARKS_FILE = os.path.join(os.path.dirname(__file__), "bookmarks.json")
 SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "sample")
+ALDATA_DIR = os.path.join(os.path.dirname(__file__), "alldata")
 BOOKMARKS_LOCK = threading.Lock()
 
 
@@ -272,7 +274,20 @@ def files_page():
 
 @app.route("/getbookmarks", methods=["GET"])
 def get_bookmarks():
-    return jsonify({"bookmarks": load_bookmarks()})
+    bm = load_bookmarks()
+    result = {}
+    for name, entry in bm.items():
+        base = os.path.join(os.path.dirname(__file__), entry["path"])
+        pattern = entry.get("pattern", "**/*")
+        full_pattern = os.path.join(base, pattern)
+        try:
+            matches = glob.glob(full_pattern, recursive=True)
+            matches = [f for f in matches if os.path.isfile(f)]
+        except Exception:
+            matches = []
+        total_size = sum(os.path.getsize(f) for f in matches)
+        result[name] = {**entry, "count": len(matches), "total_size": total_size}
+    return jsonify({"bookmarks": result})
 
 
 @app.route("/bookmarks", methods=["POST"])
@@ -308,6 +323,36 @@ def delete_bookmark():
         save_bookmarks(bm)
     log.info("Bookmark deleted: %s", name)
     return jsonify({"status": "ok", "name": name})
+
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    bookmark = request.form.get("bookmark", "").strip()
+    if not bookmark:
+        return jsonify({"error": "Missing 'bookmark' field"}), 400
+
+    bm = load_bookmarks()
+    if bookmark not in bm:
+        return jsonify({"error": f"Bookmark '{bookmark}' not found"}), 404
+
+    base = os.path.join(os.path.dirname(__file__), bm[bookmark]["path"])
+    os.makedirs(base, exist_ok=True)
+
+    files = request.files.getlist("files")
+    if not files or all(f.filename == "" for f in files):
+        return jsonify({"error": "No files provided"}), 400
+
+    saved = []
+    for f in files:
+        if f.filename == "":
+            continue
+        safe_name = os.path.basename(f.filename)
+        dest = os.path.join(base, safe_name)
+        f.save(dest)
+        saved.append({"name": safe_name, "size": os.path.getsize(dest)})
+        log.info("Uploaded %s -> %s", safe_name, dest)
+
+    return jsonify({"status": "ok", "bookmark": bookmark, "saved": len(saved), "files": saved})
 
 
 @app.route("/getfile", methods=["GET"])
@@ -377,20 +422,238 @@ def file_counts():
 
     full_pattern, bm = resolve_bookmark_path(bookmark)
     if full_pattern is None:
-        return jsonify({"bookmark": bookmark, "total": 0, "filtered": 0, "query": query})
+        return jsonify({"bookmark": bookmark, "total": 0, "filtered": 0, "total_size": 0, "query": query})
 
     try:
         all_files = glob.glob(full_pattern, recursive=True)
+        all_files = [f for f in all_files if os.path.isfile(f)]
     except Exception:
         all_files = []
 
     total = len(all_files)
+    total_size = sum(os.path.getsize(f) for f in all_files)
     filtered = total
+    filtered_size = total_size
     if query:
         q = query.lower()
-        filtered = sum(1 for f in all_files if q in os.path.basename(f).lower())
+        matched = [f for f in all_files if q in os.path.basename(f).lower()]
+        filtered = len(matched)
+        filtered_size = sum(os.path.getsize(f) for f in matched)
 
-    return jsonify({"bookmark": bookmark, "total": total, "filtered": filtered, "query": query})
+    return jsonify({
+        "bookmark": bookmark,
+        "total": total,
+        "filtered": filtered,
+        "total_size": total_size,
+        "filtered_size": filtered_size,
+        "query": query,
+    })
+
+
+# --- Data Save / Retrieve ---
+
+@app.route("/alldata_ui", methods=["GET"])
+def alldata_ui():
+    return render_template("alldata.html")
+
+
+@app.route("/alldata_folders", methods=["GET"])
+def alldata_folders():
+    os.makedirs(ALDATA_DIR, exist_ok=True)
+    entries = []
+    # Root-level files
+    root_files = [f for f in glob.glob(os.path.join(ALDATA_DIR, "*.*"))
+                  if os.path.isfile(f) and (f.endswith(".json") or f.endswith(".xml"))]
+    if root_files:
+        total_size = sum(os.path.getsize(f) for f in root_files)
+        entries.append({"name": "(root)", "count": len(root_files), "total_size": total_size})
+    # Subfolders
+    for d in sorted(os.listdir(ALDATA_DIR)):
+        full = os.path.join(ALDATA_DIR, d)
+        if os.path.isdir(full):
+            files = [f for f in glob.glob(os.path.join(full, "**", "*.*"), recursive=True)
+                     if os.path.isfile(f) and (f.endswith(".json") or f.endswith(".xml"))]
+            total_size = sum(os.path.getsize(f) for f in files)
+            entries.append({"name": d, "count": len(files), "total_size": total_size})
+    return jsonify({"folders": entries, "total_files": sum(e["count"] for e in entries)})
+
+def _to_pascalvoc(data):
+    root = ET.Element("annotation")
+    if "filename" in data:
+        ET.SubElement(root, "filename").text = str(data["filename"])
+    if "folder" in data:
+        ET.SubElement(root, "folder").text = str(data["folder"])
+    if "size" in data and isinstance(data["size"], dict):
+        size_el = ET.SubElement(root, "size")
+        for k in ("width", "height", "depth"):
+            if k in data["size"]:
+                ET.SubElement(size_el, k).text = str(data["size"][k])
+    if "source" in data and isinstance(data["source"], dict):
+        src = ET.SubElement(root, "source")
+        for k, v in data["source"].items():
+            ET.SubElement(src, k).text = str(v)
+    objects = data.get("objects", data.get("object", []))
+    if isinstance(objects, dict):
+        objects = [objects]
+    for obj in objects:
+        o = ET.SubElement(root, "object")
+        if "name" in obj:
+            ET.SubElement(o, "name").text = str(obj["name"])
+        if "confidence" in obj:
+            ET.SubElement(o, "confidence").text = str(obj["confidence"])
+        if "pose" in obj:
+            ET.SubElement(o, "pose").text = str(obj["pose"])
+        if "truncated" in obj:
+            ET.SubElement(o, "truncated").text = str(obj["truncated"])
+        if "difficult" in obj:
+            ET.SubElement(o, "difficult").text = str(obj["difficult"])
+        if "bndbox" in obj and isinstance(obj["bndbox"], dict):
+            bb = obj["bndbox"]
+            bndbox = ET.SubElement(o, "bndbox")
+            for k in ("xmin", "ymin", "xmax", "ymax"):
+                if k in bb:
+                    ET.SubElement(bndbox, k).text = str(int(bb[k]) if isinstance(bb[k], float) else bb[k])
+        elif "bbox" in obj and isinstance(obj["bbox"], dict):
+            bb = obj["bbox"]
+            bndbox = ET.SubElement(o, "bndbox")
+            keys_map = {"x1": "xmin", "y1": "ymin", "x2": "xmax", "y2": "ymax"}
+            for sk, ek in keys_map.items():
+                if sk in bb:
+                    ET.SubElement(bndbox, ek).text = str(int(bb[sk]) if isinstance(bb[sk], float) else bb[sk])
+    for k, v in data.items():
+        if k not in ("filename", "folder", "size", "source", "objects", "object"):
+            if not isinstance(v, (dict, list)):
+                ET.SubElement(root, k).text = str(v)
+    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+
+
+@app.route("/alldata", methods=["POST"])
+def save_data():
+    tag = request.args.get("TAG", "").strip()
+    folder = request.args.get("FOLDER", "").strip()
+    filetype = request.args.get("filetype", "JSON").strip().upper()
+
+    if not tag:
+        return jsonify({"error": "Missing ?TAG= parameter"}), 400
+
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be valid JSON"}), 400
+
+    uid = uuid.uuid4().hex[:12]
+    filename = f"{uid}_{tag}"
+
+    save_dir = ALDATA_DIR
+    if folder:
+        save_dir = os.path.join(ALDATA_DIR, folder)
+    os.makedirs(save_dir, ok=True)
+
+    if filetype == "PASCALVOC":
+        xml_str = _to_pascalvoc(data)
+        filepath = os.path.join(save_dir, filename + ".xml")
+        with open(filepath, "w") as f:
+            f.write(xml_str)
+    else:
+        filepath = os.path.join(save_dir, filename + ".json")
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+
+    rel_path = os.path.relpath(filepath, os.path.dirname(__file__))
+    log.info("Data saved: %s", rel_path)
+    return jsonify({
+        "status": "ok",
+        "id": uid,
+        "tag": tag,
+        "folder": folder,
+        "filetype": filetype,
+        "path": rel_path,
+    })
+
+
+@app.route("/alldata", methods=["GET"])
+def list_data():
+    folder = request.args.get("FOLDER", "").strip()
+    tag = request.args.get("TAG", "").strip()
+    query = request.args.get("query", "").strip()
+    limit = request.args.get("limit", 50, type=int)
+    offset = request.args.get("offset", 0, type=int)
+
+    search_dir = ALDATA_DIR
+    if folder:
+        search_dir = os.path.join(ALDATA_DIR, folder)
+
+    if not os.path.isdir(search_dir):
+        return jsonify({"files": [], "total": 0, "folder": folder, "tag": tag, "query": query})
+
+    pattern = os.path.join(search_dir, "**", "*.*")
+    all_files = glob.glob(pattern, recursive=True)
+    all_files = [f for f in all_files if os.path.isfile(f) and (f.endswith(".json") or f.endswith(".xml"))]
+
+    if tag:
+        t = tag.lower()
+        all_files = [f for f in all_files if t in os.path.basename(f).lower()]
+
+    if query:
+        q = query.lower()
+        all_files = [f for f in all_files if q in os.path.basename(f).lower()]
+
+    all_files.sort(reverse=True)
+    total = len(all_files)
+    page = all_files[offset:offset + limit]
+
+    results = []
+    for fp in page:
+        stat = os.stat(fp)
+        results.append({
+            "path": os.path.relpath(fp, os.path.dirname(__file__)),
+            "name": os.path.basename(fp),
+            "size": stat.st_size,
+            "modified": stat.st_mtime,
+        })
+
+    return jsonify({
+        "files": results,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "folder": folder,
+        "tag": tag,
+        "query": query,
+    })
+
+
+@app.route("/alldata/<path:file_id>", methods=["GET"])
+def get_data(file_id):
+    if not file_id:
+        return jsonify({"error": "Missing file ID"}), 400
+
+    candidates = glob.glob(os.path.join(ALDATA_DIR, "**", f"{file_id}.*"), recursive=True)
+    if not candidates:
+        return jsonify({"error": f"No data file found matching '{file_id}'"}), 404
+
+    filepath = candidates[0]
+    if filepath.endswith(".json"):
+        with open(filepath) as f:
+            data = json.load(f)
+        return jsonify({"id": file_id, "path": os.path.relpath(filepath, os.path.dirname(__file__)), "data": data})
+    else:
+        mime = "text/xml"
+        return send_file(filepath, mimetype=mime)
+
+
+@app.route("/alldata/<path:file_id>", methods=["DELETE"])
+def delete_data(file_id):
+    if not file_id:
+        return jsonify({"error": "Missing file ID"}), 400
+
+    candidates = glob.glob(os.path.join(ALDATA_DIR, "**", f"{file_id}.*"), recursive=True)
+    if not candidates:
+        return jsonify({"error": f"No data file found matching '{file_id}'"}), 404
+
+    filepath = candidates[0]
+    os.remove(filepath)
+    log.info("Deleted alldata: %s", os.path.relpath(filepath, os.path.dirname(__file__)))
+    return jsonify({"status": "ok", "deleted": os.path.relpath(filepath, os.path.dirname(__file__))})
 
 
 if __name__ == "__main__":

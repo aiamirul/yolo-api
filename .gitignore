@@ -7,3 +7,4 @@ server.pid
 vram_usage.json
 bookmarks.json
 sample/
+alldata/

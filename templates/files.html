@@ -22,7 +22,9 @@
   td { padding: .5rem; border-bottom: 1px solid #21262d; vertical-align: middle; }
   .bm-name { font-weight: 600; color: #f0883e; font-family: monospace; }
   .bm-path { color: #8b949e; font-size: .78rem; font-family: monospace; }
-  .bm-count { font-family: monospace; color: #3fb950; }
+  .bm-stat { font-family: monospace; font-size: .8rem; white-space: nowrap; }
+  .bm-stat .count { color: #3fb950; }
+  .bm-stat .size { color: #8b949e; }
   .empty { color: #8b949e; text-align: center; padding: 1.5rem; font-size: .85rem; }
 
   .form-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
@@ -32,11 +34,15 @@
   .form-group input:focus { border-color: #58a6ff; }
   .form-group .hint { font-size: .72rem; color: #6e7681; margin-top: .2rem; }
 
-  .btn { padding: .5rem 1.2rem; border-radius: 8px; font-size: .85rem; cursor: pointer; font-weight: 600; border: 1px solid transparent; transition: background .15s; }
+  .btn { padding: .5rem 1.2rem; border-radius: 8px; font-size: .85rem; cursor: pointer; font-weight: 600; border: 1px solid transparent; transition: background .15s; display: inline-flex; align-items: center; gap: .4rem; }
   .btn-add { background: #238636; color: #fff; border-color: #2ea043; }
   .btn-add:hover { background: #2ea043; }
   .btn-search { background: #1f6feb; color: #fff; border-color: #388bfd; }
   .btn-search:hover { background: #388bfd; }
+  .btn-upload { background: #8957e5; color: #fff; border-color: #a371f7; }
+  .btn-upload:hover { background: #a371f7; }
+  .btn-dl { padding: 3px 10px; background: #1f6feb; color: #fff; border-color: #388bfd; border-radius: 6px; font-size: .75rem; cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn-dl:hover { background: #388bfd; }
   .btn-del { padding: 3px 10px; background: #da3633; color: #fff; border-color: #f85149; border-radius: 6px; font-size: .75rem; cursor: pointer; }
   .btn-del:hover { background: #f85149; }
   .btn:disabled { opacity: .4; cursor: default; }
@@ -55,6 +61,15 @@
   .result-path { font-family: monospace; color: #8b949e; font-size: .75rem; }
   .result-size { color: #8b949e; font-size: .75rem; white-space: nowrap; }
 
+  .upload-zone { border: 2px dashed #30363d; border-radius: 10px; padding: 1.25rem; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; margin-top: .75rem; }
+  .upload-zone:hover { border-color: #a371f7; background: #161b22; }
+  .upload-zone.dragover { border-color: #a371f7; background: #1c1530; }
+  .upload-zone input { display: none; }
+  .upload-zone p { color: #8b949e; font-size: .82rem; margin-top: .3rem; }
+  .upload-zone .icon { font-size: 1.5rem; }
+  .upload-list { margin-top: .5rem; text-align: left; font-size: .78rem; color: #8b949e; }
+  .upload-list div { padding: 2px 0; }
+
   .code-block { position: relative; }
   .code-block pre { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; color: #c9d1d9; }
   .copy-btn { position: absolute; top: .5rem; right: .5rem; background: #30363d; border: 1px solid #484f58; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; }
@@ -66,6 +81,7 @@
   <div class="nav">
     <a href="#" onclick="location.href=BASE+'/gui';return false">Back to GUI</a>
     <a href="#" onclick="location.href=BASE+'/manage';return false">Models</a>
+    <a href="#" onclick="location.href=BASE+'/alldata_ui';return false">Data</a>
   </div>
   <h1>File Manager</h1>
   <p class="subtitle">Manage directory bookmarks for serving video and image files.</p>
@@ -107,6 +123,27 @@
     <span class="msg" id="add-msg"></span>
   </div>
 
+  <!-- Upload to Bookmark -->
+  <div class="section">
+    <h2>Upload Files</h2>
+    <div class="form-row">
+      <div class="form-group" style="max-width:280px;">
+        <label>Target Bookmark</label>
+        <select id="upload-bookmark"></select>
+      </div>
+    </div>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="upload-input" multiple>
+      <div class="icon">&#128228;</div>
+      <p>Click or drop files to upload</p>
+      <div class="upload-list" id="upload-list"></div>
+    </div>
+    <div style="margin-top:.75rem;display:flex;gap:.75rem;align-items:center;">
+      <button class="btn btn-upload" id="upload-btn" disabled>Upload</button>
+      <span class="msg" id="upload-msg"></span>
+    </div>
+  </div>
+
   <!-- Test Search -->
   <div class="section">
     <h2>Test Search</h2>
@@ -144,6 +181,15 @@
       <pre>curl "http://localhost:5000/getfile?bookmark=USH&query=2026&limit=1"</pre>
     </div>
 
+    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Upload files to a bookmark</p>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>curl -X POST http://localhost:5000/upload \
+  -F "bookmark=USH" \
+  -F "files=@video.mp4" \
+  -F "files=@image.jpg"</pre>
+    </div>
+
     <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Count files in bookmark</p>
     <div class="code-block">
       <button class="copy-btn" onclick="copyCode(this)">Copy</button>
@@ -172,12 +218,14 @@
 const BASE = location.pathname.replace(/\/files\/?$/, '') || '';
 
 function fmtSize(b) {
-  if (!b) return '0 B';
-  const u = ['B','KB','MB','GB'];
+  if (!b || b === 0) return '0 B';
+  const u = ['B','KB','MB','GB','TB'];
   let i = 0;
   while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
   return b.toFixed(1) + ' ' + u[i];
 }
+
+let allBookmarkNames = [];
 
 async function loadBookmarks() {
   try {
@@ -185,13 +233,14 @@ async function loadBookmarks() {
     const data = await res.json();
     const bm = data.bookmarks || {};
     const names = Object.keys(bm);
+    allBookmarkNames = names;
 
     // Table
     const tableDiv = document.getElementById('bookmarks-table');
     if (names.length === 0) {
       tableDiv.innerHTML = '<p class="empty">No bookmarks yet. Add one below.</p>';
     } else {
-      let html = '<table><tr><th>Name</th><th>Path</th><th>Pattern</th><th>Label</th><th></th></tr>';
+      let html = '<table><tr><th>Name</th><th>Path</th><th>Pattern</th><th>Label</th><th>Files</th><th>Total Size</th><th></th></tr>';
       names.forEach(n => {
         const e = bm[n];
         html += `<tr>
@@ -199,6 +248,8 @@ async function loadBookmarks() {
           <td class="bm-path">${e.path}</td>
           <td class="bm-path">${e.pattern}</td>
           <td>${e.label || ''}</td>
+          <td class="bm-stat"><span class="count">${e.count ?? '—'}</span></td>
+          <td class="bm-stat"><span class="size">${fmtSize(e.total_size)}</span></td>
           <td><button class="btn-del" onclick="deleteBookmark('${n}')">Delete</button></td>
         </tr>`;
       });
@@ -206,17 +257,19 @@ async function loadBookmarks() {
       tableDiv.innerHTML = html;
     }
 
-    // Search dropdown
-    const sel = document.getElementById('search-bookmark');
-    const curVal = sel.value;
-    sel.innerHTML = '<option value="">-- select --</option>';
-    names.forEach(n => {
-      const opt = document.createElement('option');
-      opt.value = n;
-      opt.textContent = n + ' (' + bm[n].label + ')';
-      sel.appendChild(opt);
+    // Populate all bookmark dropdowns
+    ['search-bookmark', 'upload-bookmark'].forEach(id => {
+      const sel = document.getElementById(id);
+      const curVal = sel.value;
+      sel.innerHTML = '<option value="">-- select --</option>';
+      names.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = n + ' (' + (bm[n].label || '') + ')';
+        sel.appendChild(opt);
+      });
+      if (curVal && names.includes(curVal)) sel.value = curVal;
     });
-    if (curVal && names.includes(curVal)) sel.value = curVal;
   } catch (err) {
     console.error('Failed to load bookmarks:', err);
   }
@@ -234,6 +287,7 @@ async function deleteBookmark(name) {
   } catch {}
 }
 
+// --- Add Bookmark ---
 document.getElementById('add-btn').addEventListener('click', async () => {
   const name = document.getElementById('bm-name').value.trim();
   const path = document.getElementById('bm-path').value.trim();
@@ -271,6 +325,90 @@ document.getElementById('add-btn').addEventListener('click', async () => {
   btn.disabled = false;
 });
 
+// --- Upload ---
+let uploadFiles = [];
+const uploadZone = document.getElementById('upload-zone');
+const uploadInput = document.getElementById('upload-input');
+const uploadList = document.getElementById('upload-list');
+const uploadBtn = document.getElementById('upload-btn');
+const uploadMsg = document.getElementById('upload-msg');
+
+uploadZone.addEventListener('click', () => uploadInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  addUploadFiles(e.dataTransfer.files);
+});
+uploadInput.addEventListener('change', () => addUploadFiles(uploadInput.files));
+
+function addUploadFiles(fileList) {
+  for (const f of fileList) {
+    if (!uploadFiles.some(u => u.name === f.name && u.size === f.size)) {
+      uploadFiles.push(f);
+    }
+  }
+  renderUploadList();
+}
+
+function renderUploadList() {
+  if (uploadFiles.length === 0) {
+    uploadList.innerHTML = '';
+    uploadBtn.disabled = true;
+    return;
+  }
+  let html = '';
+  let totalSize = 0;
+  uploadFiles.forEach((f, i) => {
+    totalSize += f.size;
+    html += `<div>${f.name} <span style="color:#6e7681">(${fmtSize(f.size)})</span> <span style="color:#f85149;cursor:pointer" onclick="removeUploadFile(${i})">x</span></div>`;
+  });
+  html += `<div style="margin-top:.3rem;color:#8b949e;border-top:1px solid #30363d;padding-top:.3rem">${uploadFiles.length} file(s) - ${fmtSize(totalSize)}</div>`;
+  uploadList.innerHTML = html;
+  uploadBtn.disabled = false;
+}
+
+window.removeUploadFile = function(i) {
+  uploadFiles.splice(i, 1);
+  renderUploadList();
+};
+
+uploadBtn.addEventListener('click', async () => {
+  const bookmark = document.getElementById('upload-bookmark').value;
+  if (!bookmark) { uploadMsg.className = 'msg err'; uploadMsg.textContent = 'Select a bookmark'; return; }
+  if (uploadFiles.length === 0) return;
+
+  uploadBtn.disabled = true;
+  uploadMsg.className = 'msg ok';
+  uploadMsg.textContent = 'Uploading...';
+
+  const fd = new FormData();
+  fd.append('bookmark', bookmark);
+  uploadFiles.forEach(f => fd.append('files', f));
+
+  try {
+    const res = await fetch(BASE + '/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (res.ok) {
+      uploadMsg.className = 'msg ok';
+      uploadMsg.textContent = data.saved + ' file(s) uploaded to ' + bookmark;
+      uploadFiles = [];
+      uploadList.innerHTML = '';
+      uploadInput.value = '';
+      loadBookmarks();
+    } else {
+      uploadMsg.className = 'msg err';
+      uploadMsg.textContent = data.error;
+    }
+  } catch (err) {
+    uploadMsg.className = 'msg err';
+    uploadMsg.textContent = 'Upload failed: ' + err.message;
+  }
+  uploadBtn.disabled = false;
+});
+
+// --- Search ---
 document.getElementById('search-btn').addEventListener('click', async () => {
   const bookmark = document.getElementById('search-bookmark').value;
   const query = document.getElementById('search-query').value.trim();
@@ -299,22 +437,40 @@ document.getElementById('search-btn').addEventListener('click', async () => {
       } else if (data.files) {
         let html = `<p style="font-size:.82rem;color:#8b949e;margin-top:.5rem">Found ${data.count} file(s):</p>`;
         data.files.forEach(f => {
+          const dlUrl = BASE + '/getfile?bookmark=' + encodeURIComponent(bookmark) + '&query=' + encodeURIComponent(f.name) + '&limit=1';
           html += `<div class="result-item">
-            <div><div class="result-name">${f.name}</div><div class="result-path">${f.path}</div></div>
-            <div class="result-size">${fmtSize(f.size)}</div>
+            <div>
+              <div class="result-name">${f.name}</div>
+              <div class="result-path">${f.path}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;">
+              <span class="result-size">${fmtSize(f.size)}</span>
+              <a class="btn-dl" href="${dlUrl}" download="${f.name}">Download</a>
+            </div>
           </div>`;
         });
         results.innerHTML = html;
       }
     } else {
       const ct = res.headers.get('content-type');
-      const url = URL.createObjectURL(await res.blob());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const fname = query || 'file';
       if (ct?.includes('video')) {
-        results.innerHTML = `<div style="margin-top:.75rem"><video controls style="max-width:100%;border-radius:8px;border:1px solid #30363d"><source src="${url}" type="${ct}"></video></div>`;
+        results.innerHTML = `<div style="margin-top:.75rem">
+          <video controls style="max-width:100%;border-radius:8px;border:1px solid #30363d"><source src="${url}" type="${ct}"></video>
+          <div style="margin-top:.5rem"><a class="btn-dl" href="${url}" download="${fname}">Download</a></div>
+        </div>`;
       } else if (ct?.includes('image')) {
-        results.innerHTML = `<div style="margin-top:.75rem"><img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid #30363d"></div>`;
+        results.innerHTML = `<div style="margin-top:.75rem">
+          <img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid #30363d">
+          <div style="margin-top:.5rem"><a class="btn-dl" href="${url}" download="${fname}">Download</a></div>
+        </div>`;
       } else {
-        results.innerHTML = `<div style="margin-top:.75rem;padding:.75rem;background:#0d1117;border:1px solid #30363d;border-radius:8px;font-size:.82rem"><p style="color:#3fb950">File served: ${ct}</p><a href="${url}" download style="color:#58a6ff">Download</a></div>`;
+        results.innerHTML = `<div style="margin-top:.75rem;padding:.75rem;background:#0d1117;border:1px solid #30363d;border-radius:8px;font-size:.82rem">
+          <p style="color:#3fb950">File served: ${ct}</p>
+          <div style="margin-top:.5rem"><a class="btn-dl" href="${url}" download="${fname}">Download</a></div>
+        </div>`;
       }
     }
   } catch (err) {

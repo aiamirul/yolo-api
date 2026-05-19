@@ -74,6 +74,15 @@
   .code-block pre { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; color: #c9d1d9; }
   .copy-btn { position: absolute; top: .5rem; right: .5rem; background: #30363d; border: 1px solid #484f58; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; }
   .copy-btn:hover { background: #484f58; }
+
+  .base-url-bar { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1.5rem; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: .75rem 1rem; }
+  .base-url-bar .form-group { flex: 1; min-width: 240px; }
+  .base-url-bar .form-group label { font-size: .72rem; }
+  .base-url-bar .current { font-size: .78rem; color: #3fb950; font-family: monospace; padding: .35rem 0; }
+  .btn-reset { background: #30363d; color: #c9d1d9; border-color: #484f58; }
+  .btn-reset:hover { background: #484f58; }
+  .btn-save { background: #1f6feb; color: #fff; border-color: #388bfd; }
+  .btn-save:hover { background: #388bfd; }
 </style>
 </head>
 <body>
@@ -85,6 +94,17 @@
   </div>
   <h1>File Manager</h1>
   <p class="subtitle">Manage directory bookmarks for serving video and image files.</p>
+
+  <!-- Base URL Config -->
+  <div class="base-url-bar">
+    <div class="form-group">
+      <label>API Base URL</label>
+      <input type="text" id="base-url-input" placeholder="http://localhost:5000">
+    </div>
+    <button class="btn btn-save" id="base-url-save">Save</button>
+    <button class="btn btn-reset" id="base-url-reset">Reset</button>
+    <span class="msg" id="base-url-msg"></span>
+  </div>
 
   <!-- Bookmarks List -->
   <div class="section">
@@ -165,57 +185,92 @@
     <div class="results" id="search-results"></div>
   </div>
 
-  <!-- Curl Examples -->
+  <!-- API Tester -->
   <div class="section">
-    <h2>API Examples</h2>
+    <h2>API Tester</h2>
+    <div class="form-row">
+      <div class="form-group" style="max-width:300px;">
+        <label>Endpoint</label>
+        <select id="api-endpoint">
+          <option value="GET /getbookmarks">GET /getbookmarks</option>
+          <option value="POST /bookmarks">POST /bookmarks</option>
+          <option value="DELETE /bookmarks">DELETE /bookmarks</option>
+          <option value="GET /getfile">GET /getfile</option>
+          <option value="GET /filecounts">GET /filecounts</option>
+        </select>
+      </div>
+    </div>
+    <div id="api-params"></div>
 
-    <p style="font-size:.82rem; color:#8b949e; margin-bottom:.5rem;">List bookmarks</p>
-    <div class="code-block">
-      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-      <pre>curl http://localhost:5000/getbookmarks</pre>
+    <div style="margin-top:.75rem;">
+      <p style="font-size:.78rem;color:#8b949e;font-weight:600;margin-bottom:.3rem;">Request Preview</p>
+      <div class="code-block" style="margin-bottom:0;">
+        <pre id="api-preview" style="min-height:2.5rem;"></pre>
+      </div>
     </div>
 
-    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Search for a file (serves file bytes if found)</p>
-    <div class="code-block">
-      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-      <pre>curl "http://localhost:5000/getfile?bookmark=USH&query=2026&limit=1"</pre>
+    <div style="margin-top:.75rem;display:flex;gap:.75rem;align-items:center;">
+      <button class="btn btn-search" id="api-send-btn">Send Request</button>
+      <span class="msg" id="api-status"></span>
     </div>
 
-    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Upload files to a bookmark</p>
-    <div class="code-block">
-      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-      <pre>curl -X POST http://localhost:5000/upload \
-  -F "bookmark=USH" \
-  -F "files=@video.mp4" \
-  -F "files=@image.jpg"</pre>
+    <div style="margin-top:1rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div>
+        <p style="font-size:.78rem;color:#8b949e;font-weight:600;margin-bottom:.4rem;">Actual Response</p>
+        <pre id="api-actual" style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:.75rem;min-height:80px;max-height:400px;overflow:auto;font-size:.78rem;color:#c9d1d9;white-space:pre-wrap;word-break:break-all;"></pre>
+      </div>
+      <div>
+        <p style="font-size:.78rem;color:#8b949e;font-weight:600;margin-bottom:.4rem;">Expected Response</p>
+        <pre id="api-expected" style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:.75rem;min-height:80px;max-height:400px;overflow:auto;font-size:.78rem;color:#6e7681;white-space:pre-wrap;word-break:break-all;"></pre>
+      </div>
     </div>
+  </div>
 
-    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Count files in bookmark</p>
-    <div class="code-block">
-      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-      <pre>curl "http://localhost:5000/filecounts?bookmark=USH&query=2026"</pre>
-    </div>
-
-    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Add a bookmark</p>
-    <div class="code-block">
-      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-      <pre>curl -X POST http://localhost:5000/bookmarks \
-  -H "Content-Type: application/json" \
-  -d '{"name":"USH","path":"data/USH","pattern":"*/*.mp4","label":"USH Videos"}'</pre>
-    </div>
-
-    <p style="font-size:.82rem; color:#8b949e; margin: .75rem 0 .5rem;">Delete a bookmark</p>
-    <div class="code-block">
-      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-      <pre>curl -X DELETE http://localhost:5000/bookmarks \
-  -H "Content-Type: application/json" \
-  -d '{"name":"USH"}'</pre>
-    </div>
+  <!-- Curl Examples -->
+  <div class="section" id="curl-examples">
+    <h2>Curl Examples</h2>
+    <div id="curl-examples-pre"></div>
   </div>
 </div>
 
 <script>
-const BASE = location.pathname.replace(/\/files\/?$/, '') || '';
+const DEFAULT_BASE = 'http://localhost:5000';
+const LS_KEY = 'api_base_url';
+let BASE = localStorage.getItem(LS_KEY) || DEFAULT_BASE;
+// Strip trailing slash
+if (BASE.endsWith('/')) BASE = BASE.slice(0, -1);
+
+// --- Base URL management ---
+const baseUrlInput = document.getElementById('base-url-input');
+const baseUrlMsg = document.getElementById('base-url-msg');
+baseUrlInput.value = BASE;
+
+document.getElementById('base-url-save').addEventListener('click', () => {
+  let val = baseUrlInput.value.trim();
+  if (!val) { baseUrlMsg.className = 'msg err'; baseUrlMsg.textContent = 'Enter a URL'; return; }
+  if (val.endsWith('/')) val = val.slice(0, -1);
+  localStorage.setItem(LS_KEY, val);
+  BASE = val;
+  baseUrlInput.value = val;
+  baseUrlMsg.className = 'msg ok';
+  baseUrlMsg.textContent = 'Saved';
+  updatePreview();
+  refreshCurlExamples();
+});
+
+document.getElementById('base-url-reset').addEventListener('click', () => {
+  localStorage.removeItem(LS_KEY);
+  BASE = DEFAULT_BASE;
+  baseUrlInput.value = DEFAULT_BASE;
+  baseUrlMsg.className = 'msg ok';
+  baseUrlMsg.textContent = 'Reset to default';
+  updatePreview();
+  refreshCurlExamples();
+});
+
+function refreshCurlExamples() {
+  renderCurlExamples();
+}
 
 function fmtSize(b) {
   if (!b || b === 0) return '0 B';
@@ -486,6 +541,211 @@ function copyCode(btn) {
     setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
   });
 }
+
+// --- API Tester ---
+const EXPECTED = {
+  'GET /getbookmarks': {
+    bookmarks: {
+      EXAMPLE: { path: "data/EXAMPLE", pattern: "**/*", label: "Example", count: 0, total_size: 0 }
+    }
+  },
+  'POST /bookmarks': { status: "ok", name: "EXAMPLE" },
+  'DELETE /bookmarks': { status: "ok", name: "EXAMPLE" },
+  'GET /getfile': {
+    bookmark: "EXAMPLE",
+    query: "2026",
+    count: 2,
+    files: [
+      { path: "data/EXAMPLE/file.mp4", name: "file.mp4", size: 104857600, mime: "video/mp4" }
+    ]
+  },
+  'GET /filecounts': {
+    bookmark: "EXAMPLE",
+    total: 142,
+    filtered: 23,
+    total_size: 5368709120,
+    filtered_size: 1073741824,
+    query: "2026"
+  }
+};
+
+function renderApiParams() {
+  const ep = document.getElementById('api-endpoint').value;
+  const container = document.getElementById('api-params');
+  const expected = document.getElementById('api-expected');
+
+  const paramDefs = {
+    'GET /getbookmarks': [],
+    'POST /bookmarks': [
+      { id: 'p-name', label: 'name', placeholder: 'USH', required: true, value: 'USH' },
+      { id: 'p-path', label: 'path', placeholder: 'data/USH', required: true, value: 'data/USH' },
+      { id: 'p-pattern', label: 'pattern', placeholder: '**/*', value: '*/*.mp4' },
+      { id: 'p-label', label: 'label', placeholder: 'USH Videos', value: 'USH Videos' }
+    ],
+    'DELETE /bookmarks': [
+      { id: 'p-name', label: 'name', placeholder: 'USH', required: true, value: 'USH' }
+    ],
+    'GET /getfile': [
+      { id: 'p-bookmark', label: 'bookmark', placeholder: 'USH', required: true, value: 'USH' },
+      { id: 'p-query', label: 'query', placeholder: '2026', value: '2026' },
+      { id: 'p-limit', label: 'limit', placeholder: '5', value: '5' }
+    ],
+    'GET /filecounts': [
+      { id: 'p-bookmark', label: 'bookmark', placeholder: 'USH', required: true, value: 'USH' },
+      { id: 'p-query', label: 'query', placeholder: '2026', value: '2026' }
+    ]
+  };
+
+  const defs = paramDefs[ep] || [];
+  if (defs.length === 0) {
+    container.innerHTML = '<p style="font-size:.82rem;color:#6e7681;margin-top:.5rem;">No parameters needed.</p>';
+  } else {
+    let html = '<div class="form-row">';
+    defs.forEach(d => {
+      html += `<div class="form-group">
+        <label>${d.label}${d.required ? ' *' : ''}</label>
+        <input type="text" id="${d.id}" placeholder="${d.placeholder}" value="${d.value || ''}">
+      </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    container.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updatePreview));
+  }
+
+  expected.textContent = JSON.stringify(EXPECTED[ep] || {}, null, 2);
+  updatePreview();
+}
+
+function updatePreview() {
+  const ep = document.getElementById('api-endpoint').value;
+  const [method, path] = ep.split(' ');
+  const preview = document.getElementById('api-preview');
+  let url = BASE + path;
+  let body = null;
+
+  if (method === 'GET' && (path === '/getfile' || path === '/filecounts')) {
+    const params = new URLSearchParams();
+    const bookmark = document.getElementById('p-bookmark')?.value?.trim();
+    const query = document.getElementById('p-query')?.value?.trim();
+    const limit = document.getElementById('p-limit')?.value?.trim();
+    if (bookmark) params.set('bookmark', bookmark);
+    if (query) params.set('query', query);
+    if (limit) params.set('limit', limit);
+    const qs = params.toString();
+    if (qs) url += '?' + qs;
+  }
+
+  if (method === 'POST' || method === 'DELETE') {
+    const obj = {};
+    document.querySelectorAll('#api-params input').forEach(inp => {
+      const key = inp.id.replace('p-', '');
+      const val = inp.value.trim();
+      if (val) obj[key] = val;
+    });
+    body = JSON.stringify(obj, null, 2);
+  }
+
+  let lines = [];
+  if (body) {
+    lines.push(`curl -X ${method} '${url}' \\`);
+    lines.push(`  -H 'Content-Type: application/json' \\`);
+    lines.push(`  -d '${body}'`);
+  } else {
+    lines.push(`curl ${method} '${url}'`);
+  }
+
+  if (method === 'POST' || method === 'DELETE') {
+    lines.push('');
+    lines.push('// JSON body:');
+    lines.push(body);
+  }
+
+  preview.textContent = lines.join('\n');
+}
+
+document.getElementById('api-endpoint').addEventListener('change', renderApiParams);
+
+document.getElementById('api-send-btn').addEventListener('click', async () => {
+  const ep = document.getElementById('api-endpoint').value;
+  const [method, path] = ep.split(' ');
+  const actual = document.getElementById('api-actual');
+  const status = document.getElementById('api-status');
+  const btn = document.getElementById('api-send-btn');
+
+  btn.disabled = true;
+  status.className = 'msg';
+  status.textContent = 'Sending...';
+  actual.textContent = '';
+
+  try {
+    let url = BASE + path;
+    let fetchOpts = { method };
+
+    if (method === 'GET' && (path === '/getfile' || path === '/filecounts')) {
+      const params = new URLSearchParams();
+      const bookmark = document.getElementById('p-bookmark')?.value?.trim();
+      const query = document.getElementById('p-query')?.value?.trim();
+      const limit = document.getElementById('p-limit')?.value?.trim();
+      if (bookmark) params.set('bookmark', bookmark);
+      if (query) params.set('query', query);
+      if (limit) params.set('limit', limit);
+      url += '?' + params.toString();
+    }
+
+    if (method === 'POST' || method === 'DELETE') {
+      const body = {};
+      document.querySelectorAll('#api-params input').forEach(inp => {
+        const key = inp.id.replace('p-', '');
+        const val = inp.value.trim();
+        if (val) body[key] = val;
+      });
+      fetchOpts.headers = { 'Content-Type': 'application/json' };
+      fetchOpts.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(url, fetchOpts);
+    const ct = res.headers.get('content-type') || '';
+
+    if (ct.includes('application/json')) {
+      const data = await res.json();
+      actual.textContent = JSON.stringify(data, null, 2);
+      actual.style.color = res.ok ? '#c9d1d9' : '#f85149';
+      status.className = res.ok ? 'msg ok' : 'msg err';
+      status.textContent = res.status + ' ' + res.statusText;
+    } else {
+      actual.textContent = `[${res.status}] Content-Type: ${ct}\n\nBinary response — use the Search section to view files.`;
+      actual.style.color = '#8b949e';
+      status.className = 'msg ok';
+      status.textContent = res.status + ' ' + res.statusText;
+    }
+  } catch (err) {
+    actual.textContent = 'Error: ' + err.message;
+    actual.style.color = '#f85149';
+    status.className = 'msg err';
+    status.textContent = 'Request failed';
+  }
+  btn.disabled = false;
+});
+
+renderApiParams();
+
+function renderCurlExamples() {
+  const examples = [
+    { label: 'List bookmarks', cmd: `curl ${BASE}/getbookmarks` },
+    { label: 'Search for a file (serves file bytes if found)', cmd: `curl "${BASE}/getfile?bookmark=USH&query=2026&limit=1"` },
+    { label: 'Upload files to a bookmark', cmd: `curl -X POST ${BASE}/upload \\\n  -F "bookmark=USH" \\\n  -F "files=@video.mp4" \\\n  -F "files=@image.jpg"` },
+    { label: 'Count files in bookmark', cmd: `curl "${BASE}/filecounts?bookmark=USH&query=2026"` },
+    { label: 'Add a bookmark', cmd: `curl -X POST ${BASE}/bookmarks \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"USH","path":"data/USH","pattern":"*/*.mp4","label":"USH Videos"}'` },
+    { label: 'Delete a bookmark', cmd: `curl -X DELETE ${BASE}/bookmarks \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"USH"}'` },
+  ];
+  const container = document.getElementById('curl-examples-pre');
+  container.innerHTML = examples.map(e =>
+    `<p style="font-size:.82rem;color:#8b949e;margin-bottom:.5rem;">${e.label}</p>
+     <div class="code-block"><button class="copy-btn" onclick="copyCode(this)">Copy</button><pre>${e.cmd}</pre></div>`
+  ).join('\n');
+}
+
+renderCurlExamples();
 
 loadBookmarks();
 </script>
